@@ -168,60 +168,50 @@ VARIABLE_SPECS = [
 # ## Iberia HEALPix mask (input-side only)
 #
 # DestinE IFS-NEMO output is on HEALPix nside=128 NESTED (~196,608
-# global cells). We use **`healpix-geo`** (not `healpy`) here because
-# `healpy` is non-geo-aware (cosmology-first; lon convention 0–360, no
-# CRS handling, no datum) and accumulates small biases that are
-# unacceptable for biodiversity-precision climate-impact work over
-# Iberia (`DOMAIN.md` § Biodiversity is high-precision climate-impact
-# science).
+# global cells). The Iberian cell-index list is **pre-computed** by a
+# small local script (using `healpix-geo` on the user's Mac) and
+# committed to `data/precomputed/iberia_pix_nside128_nested.npy`.
+# This way:
 #
-# **HEALPix is the INPUT format only.** This notebook subsets the
-# global HEALPix output to Iberian cells and writes the subset NetCDF.
-# The actual *analytical grid* is the 100 km CEA grid the upstream
-# weatherxbio v0.2.0 GLMM was fitted on — the HEALPix→CEA aggregation
-# happens at the import boundary in `06_destine_clean.py`. The GLMM
-# coefficients are applied on CEA cells (same grid they were fitted
-# on), preserving consistency with the validated upstream `sc_TEI_delta`.
+# - DestinE notebook 05 needs **only `numpy + xarray + earthkit-data + polytope-client`** —
+#   no HEALPix library required on the platform side. The precomputed
+#   index list is deterministic given (nside=128, NESTED, Iberia bbox),
+#   so committing it is reproducible from the source script
+#   (`scripts/precompute_iberia_pix.py`, run locally where healpix-geo
+#   works cleanly).
+# - The 440 nside=128 cells are the **NESTED children** of the 110
+#   nside=64 cells used by the Tier-1 HEALPix fit (Phase C):
+#   each nside=64 parent has exactly 4 nside=128 children
+#   (`(parent << 2) | k`), so Phase D's aggregation
+#   (nside=128 → nside=64 via `pix >> 2`) is a clean equal-area 4:1
+#   mean with no resampling artefacts.
 #
-# Per `DOMAIN.md`: HEALPix indexing is **always NESTED**.
+# Per `DOMAIN.md`: HEALPix indexing is **always NESTED** in this
+# project — `nest=True` everywhere.
 
 # %%
 import numpy as np  # noqa: E402
-# CHECK: healpix-geo API. The exact symbol/function names may differ
-# in your installed version. The minimal contract we need is:
-#   - npix lookup for nside=128 NESTED  (==> 196,608 cells)
-#   - geo-aware cell-center lon/lat lookup, lon in [-180, 180]
-# If the installed package surfaces these under different names, swap
-# the imports below; the rest of the notebook is API-agnostic.
-import healpix_geo  # noqa: E402
 
 DESTINE_NSIDE = 128
 DESTINE_NPIX = 12 * DESTINE_NSIDE * DESTINE_NSIDE   # 196,608 (HEALPix invariant)
 
-# CHECK: `healpix_geo.nested.cell_centroids(nside, ipix)` is the most
-# likely API; alternatives include `healpix_geo.HealpixGrid(...).cell_centers`
-# or `healpix_geo.lonlat(nside, ipix, scheme='nested')`. Adjust to match
-# your version on the DestinE platform.
-_all_pix = np.arange(DESTINE_NPIX)
-try:
-    _lons, _lats = healpix_geo.nested.cell_centroids(DESTINE_NSIDE, _all_pix)
-except AttributeError:
-    # Fallback shape: a HealpixGrid-class API
-    _grid = healpix_geo.HealpixGrid(nside=DESTINE_NSIDE, scheme="nested")
-    _lons, _lats = _grid.cell_centers(_all_pix)
-
-# healpix-geo is geo-aware → lon in [-180, 180], no Greenwich-wrap kludge
-_iberia_mask = (
-    (_lons >= IBERIA_AREA["west"])  & (_lons <= IBERIA_AREA["east"])
-    & (_lats >= IBERIA_AREA["south"]) & (_lats <= IBERIA_AREA["north"])
+_pix_file = ROOT / "data" / "precomputed" / "iberia_pix_nside128_nested.npy"
+if not _pix_file.exists():
+    raise SystemExit(
+        f"Missing {_pix_file}. Regenerate locally with "
+        "`scripts/precompute_iberia_pix.py` and commit, then re-pull on DestinE."
+    )
+IBERIA_PIX = np.load(_pix_file).astype(np.int64)
+assert len(IBERIA_PIX) == 440, (
+    f"expected 440 nside=128 cells (4 × 110 nside=64 parents); "
+    f"got {len(IBERIA_PIX)}"
 )
-IBERIA_PIX = _all_pix[_iberia_mask]
 
 print(f"Iberia HEALPix nside={DESTINE_NSIDE} NESTED: "
       f"{len(IBERIA_PIX):,} cells / {DESTINE_NPIX:,} global "
       f"({100 * len(IBERIA_PIX) / DESTINE_NPIX:.2f}%)")
-print("HEALPix is INPUT format only — analytical grid is CEA "
-      "(aggregation happens in 06_destine_clean.py).")
+print("HEALPix nside=128 cells are NESTED children of the Tier-1 "
+      "HEALPix nside=64 analytical grid (4:1 parent-child mapping).")
 
 # %%
 import earthkit.data as ekd  # noqa: E402  (deferred to keep guard cheap)

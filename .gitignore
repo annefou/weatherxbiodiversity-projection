@@ -23,6 +23,10 @@ data/*
 !data/README.md
 # Exception: GBIF citation metadata — small, citation provenance, must be tracked
 !data/gbif_bombus_iberia_metadata.json
+# Exception: precomputed Iberian HEALPix cell indices — small + deterministic,
+# committed so the DestinE download notebook needs no HEALPix library installed
+!data/precomputed/
+!data/precomputed/**
 
 # Paper PDFs (single PDF allowed; subfolder build artefacts ignored)
 paper/_build/
