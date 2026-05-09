@@ -125,28 +125,27 @@ def _build_request(start_date: str, end_date: str, *,
     Without these the request expands to the right cardinality but
     matches no archived data (MARS returns "0 messages retrieved").
     """
+    # NOTE: no `area` key. DestinE IFS-NEMO output is HEALPix nside=128
+    # NESTED, and MARS errors with "Representation::croppedRepresentation()
+    # not implemented for HEALPixNested" if `area` is supplied. We fetch
+    # globally (~786 KB per timestep, lightweight on the wire) and subset
+    # to Iberian HEALPix pixels in-process before writing the NetCDF.
     return {
-        "class": "d1",                          # DestinE
-        "dataset": "climate-dt",                # Climate DT
+        "class": "d1",
+        "dataset": "climate-dt",
         "activity": "ScenarioMIP",
         "experiment": "SSP3-7.0",
-        "expver": "0001",                       # experiment version (required)
-        "generation": "1",                      # model generation (required)
-        "realization": "1",                     # ensemble member (required)
-        "model": "IFS-NEMO",                    # IFS-NEMO has SSP3-7.0; ICON did not match
-        "resolution": "standard",               # 'standard' is the archived resolution
+        "expver": "0001",
+        "generation": "1",
+        "realization": "1",
+        "model": "IFS-NEMO",
+        "resolution": "standard",
         "type": "fc",
-        "stream": "clte",                       # Climate experimental
-        "levtype": "sfc",                       # surface fields
-        "param": param,                         # 167 (2t) or 228 (tp)
+        "stream": "clte",
+        "levtype": "sfc",
+        "param": param,
         "date": f"{start_date}/to/{end_date}",
-        "time": time,                           # 4-times/day for 167; '0000' for 228
-        "area": [
-            IBERIA_AREA["north"],
-            IBERIA_AREA["west"],
-            IBERIA_AREA["south"],
-            IBERIA_AREA["east"],
-        ],
+        "time": time,
     }
 
 
@@ -164,6 +163,38 @@ VARIABLE_SPECS = [
 
 # %% [markdown]
 # ## Fetch each horizon
+
+# %% [markdown]
+# ## Iberia HEALPix mask
+#
+# DestinE IFS-NEMO output is on HEALPix nside=128 NESTED (~196,608
+# global cells). We pre-compute the indices of cells whose centres fall
+# inside the Iberian bbox so we can subset in-process before writing the
+# NetCDF — saves ~200× disk space (Iberia has ~900 cells out of 196,608
+# global) and respects the DestinE redistribution licence (only the
+# Iberian subset ever lands on disk).
+#
+# Per DOMAIN.md: HEALPix indexing is **always NESTED** in this
+# project — `nest=True` everywhere.
+
+# %%
+import numpy as np  # noqa: E402
+import healpy as hp  # noqa: E402
+
+DESTINE_NSIDE = 128                            # IFS-NEMO 'standard' resolution
+DESTINE_NPIX = hp.nside2npix(DESTINE_NSIDE)    # 196,608
+
+_all_pix = np.arange(DESTINE_NPIX)
+_lons, _lats = hp.pix2ang(DESTINE_NSIDE, _all_pix, nest=True, lonlat=True)
+# healpy returns lon in [0, 360]; Iberia spans 350°-360° + 0°-4° (handles
+# the Greenwich wrap explicitly).
+_lon_iberia = ((_lons >= (360 + IBERIA_AREA["west"])) | (_lons <= IBERIA_AREA["east"]))
+_lat_iberia = (_lats >= IBERIA_AREA["south"]) & (_lats <= IBERIA_AREA["north"])
+IBERIA_PIX = _all_pix[_lon_iberia & _lat_iberia]
+
+print(f"Iberia HEALPix nside={DESTINE_NSIDE} NESTED: "
+      f"{len(IBERIA_PIX):,} cells / {DESTINE_NPIX:,} global "
+      f"({100 * len(IBERIA_PIX) / DESTINE_NPIX:.2f}%)")
 
 # %%
 import earthkit.data as ekd  # noqa: E402  (deferred to keep guard cheap)
@@ -213,8 +244,36 @@ for horizon_name, (start, end) in HORIZONS.items():
 
         print(f"  variables: {list(xa.data_vars)}")
         print(f"  coords: {list(xa.coords)}")
+        print(f"  global sizes: {dict(xa.sizes)}")
 
-        xa.to_netcdf(out_path)
+        # Subset to Iberian HEALPix cells before writing — DestinE
+        # redistribution licence allows aggregated derived statistics
+        # but not the global raw extract.
+        # CHECK: the spatial dim name on DestinE is usually "values"
+        # (HEALPix payload). If a different name is exposed, swap below.
+        spatial_dim = "values" if "values" in xa.sizes else (
+            "cell" if "cell" in xa.sizes else None
+        )
+        if spatial_dim is None:
+            raise SystemExit(
+                "Could not find HEALPix spatial dim in xarray output. "
+                f"Available dims: {dict(xa.sizes)}"
+            )
+        if xa.sizes[spatial_dim] != DESTINE_NPIX:
+            print(f"  WARNING: spatial dim '{spatial_dim}' has "
+                  f"{xa.sizes[spatial_dim]:,} cells, expected "
+                  f"{DESTINE_NPIX:,} for nside={DESTINE_NSIDE}. "
+                  "Iberia subset may be wrong — verify HEALPix nside.")
+
+        xa_iberia = xa.isel({spatial_dim: IBERIA_PIX})
+        # Stash Iberia HEALPix indices as a coord so 06 can rebuild
+        # cell positions without reapplying the bbox mask.
+        xa_iberia = xa_iberia.assign_coords(
+            iberia_pix=(spatial_dim, IBERIA_PIX)
+        )
+        print(f"  Iberia subset sizes: {dict(xa_iberia.sizes)}")
+
+        xa_iberia.to_netcdf(out_path)
         print(f"  wrote {out_path}  ({out_path.stat().st_size:,} bytes)")
 
 print("\nAll (horizon × variable) extracts present.")

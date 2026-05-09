@@ -39,6 +39,7 @@ dependencies:
   # cleanly when DestinE credentials are absent, so installing them
   # on a non-DestinE host is safe but unused.
   - cartopy                  # Iberia coastline maps for projection figures (conda preferred — C/PROJ extension)
+  - healpy                   # HEALPix subset of DestinE IFS-NEMO global output (nside=128 NESTED) — see DOMAIN.md
   - pip
   - pip:
     # snakemake on conda-forge fails to solve under setup-micromamba@v3 —
