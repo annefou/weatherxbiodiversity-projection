@@ -254,10 +254,24 @@ for horizon_name, (start, end) in HORIZONS.items():
             address=POLYTOPE_ADDRESS,
         )
 
-        # earthkit-data returns a fieldlist; convert to xarray for NetCDF I/O.
-        # CHECK: the to_xarray() accessor may need keyword args (e.g.
-        # ``time_dim_mode="forecast"``) depending on the request shape.
-        xa = ds.to_xarray()
+        # earthkit-data's polytope source returns a streaming GRIB
+        # source that does NOT implement ``to_xarray()`` directly
+        # (NotImplementedError on StreamSingleSource). Materialise via
+        # ``to_fieldlist()`` first; if that's also unavailable on this
+        # version, fall back to save-to-temp-grib + reload.
+        try:
+            fl = ds.to_fieldlist() if hasattr(ds, "to_fieldlist") else ds
+            xa = fl.to_xarray()
+        except (NotImplementedError, AttributeError):
+            import tempfile
+            tmp_grib = Path(tempfile.gettempdir()) / (
+                f"destine_{horizon_name}_{spec['label']}.grib"
+            )
+            ds.save(str(tmp_grib))
+            print(f"  fallback: streamed to {tmp_grib} "
+                  f"({tmp_grib.stat().st_size:,} bytes), reloading via 'file' source")
+            xa = ekd.from_source("file", str(tmp_grib)).to_xarray()
+            tmp_grib.unlink(missing_ok=True)
 
         print(f"  variables: {list(xa.data_vars)}")
         print(f"  coords: {list(xa.coords)}")
