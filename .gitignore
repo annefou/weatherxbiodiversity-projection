@@ -52,6 +52,13 @@ soroye_port/phase3_forest.png
 # Snakemake metadata
 .snakemake/
 
+# Tier 2 — DestinE Climate DT (licence-locked redistribution)
+# Raw NetCDF extracts and per-cell rasters approach a climate fingerprint;
+# only the aggregated species-level summary JSON + the figures are committed.
+data/destine/
+soroye_port/outputs_iberia/*future*
+results/projection_per_cell_*.npy
+
 # Claude scratch
 .claude/.cache/
 .claude/local/

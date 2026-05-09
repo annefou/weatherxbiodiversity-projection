@@ -32,6 +32,15 @@ dependencies:
   - jupyterlab
   - nbclient
   - ipykernel
+  # --- Tier 2 only (DestinE Climate DT projection) ---
+  # These are required by notebooks/05_destine_download.py,
+  # 06_destine_clean.py, 07_projection.py, 08_projection_figures.py.
+  # The notebooks themselves are guarded by `_tier2_guard.py` and skip
+  # cleanly when DestinE credentials are absent, so installing these
+  # on a non-DestinE host is safe but unused.
+  - earthkit-data            # polytope-backed access to DestinE Climate DT
+  - polytope-client          # explicit pin (earthkit-data plugin under the hood)
+  - cartopy                  # Iberia coastline maps for projection figures
   - pip
   - pip:
     # snakemake on conda-forge fails to solve under setup-micromamba@v3 —

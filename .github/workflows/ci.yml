@@ -62,10 +62,34 @@ jobs:
       #     path: data/raw
       #     key: input-data-v1
 
-      - name: Run pipeline
+      - name: Run pipeline (Tier 1 — Iberian baseline)
         if: steps.guard.outputs.skip != 'true'
         shell: micromamba-shell {0}
         run: snakemake --cores 1
+
+      # ----- Tier 2 (DestinE Climate DT projection) -----
+      # Tier-2 notebooks are guarded by `notebooks/_tier2_guard.py`; on
+      # any host without DestinE credentials they print a SKIPPED notice
+      # and exit 0. We only attempt Tier 2 when the workflow is launched
+      # with the DESTINE_PLATFORM repository variable set to 'true' (set
+      # via Settings → Secrets and variables → Actions → Variables).
+      # Set up `~/.polytopeapirc` from the POLYTOPE_USER_KEY secret in
+      # the same conditional block when ready.
+      - name: Tier 2 — DestinE projection
+        if: ${{ steps.guard.outputs.skip != 'true' && vars.DESTINE_PLATFORM == 'true' }}
+        shell: micromamba-shell {0}
+        env:
+          DESTINE_PLATFORM: "true"
+          POLYTOPE_USER_KEY: ${{ secrets.POLYTOPE_USER_KEY }}
+        run: snakemake --cores 1 tier2
+
+      - name: Tier 2 — skip notice
+        if: ${{ steps.guard.outputs.skip != 'true' && vars.DESTINE_PLATFORM != 'true' }}
+        run: |
+          echo "::notice::Tier 2 skipped — vars.DESTINE_PLATFORM is not set to 'true'."
+          echo "Tier 2 (DestinE Climate DT projection) only runs on the DestinE Jupyter"
+          echo "platform or in CI with valid polytope-client credentials. Tier 1 ran"
+          echo "to completion in the previous step."
 
       - name: Upload results
         if: always() && steps.guard.outputs.skip != 'true'
