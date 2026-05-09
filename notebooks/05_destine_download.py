@@ -23,8 +23,15 @@ import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
 # total precipitation) over the Iberian Peninsula bounding box for two
 # decade slices:
 #
-#   * **Mid-century**: 2046–2055
-#   * **End-of-century**: 2076–2085
+#   * **Near-term**: 2020–2029 (first decade of SSP3-7.0; analogue of
+#     Soroye's "recent" 2000–2014 window)
+#   * **Mid-term**: 2030–2039 (second decade — "by 2040" projection)
+#
+# **Why not mid-/end-of-century?** The DestinE Climate DT Phase 1
+# archive is populated through 2039 inclusive (verified 2026-05-09).
+# The original design called for 2046–2055 + 2076–2085 horizons; those
+# are deferred to a follow-up Outcome when the archive extends past
+# 2050. Document this in `nanopubs/drafts/05_outcome.md` § Limitations.
 #
 # Output NetCDFs land in `data/destine/` and are **gitignored** — the
 # DestinE Climate DT data is licence-locked (no redistribution); only
@@ -71,8 +78,8 @@ IBERIA_AREA = {
 
 # Decade slices.
 HORIZONS = {
-    "2046_2055": ("20460101", "20551231"),
-    "2076_2085": ("20760101", "20851231"),
+    "2020_2029": ("20200101", "20291231"),
+    "2030_2039": ("20300101", "20391231"),
 }
 
 # Minimum sane file size (in bytes) for the cached extract to be

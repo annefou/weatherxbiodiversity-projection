@@ -43,8 +43,8 @@ import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
 #
 # Outputs (gitignored — see `.gitignore` Tier-2 section):
 #
-#   * `soroye_port/outputs_iberia/climate_tei_pei_future_2046_2055.npz`
-#   * `soroye_port/outputs_iberia/climate_tei_pei_future_2076_2085.npz`
+#   * `soroye_port/outputs_iberia/climate_tei_pei_future_2020_2029.npz`
+#   * `soroye_port/outputs_iberia/climate_tei_pei_future_2030_2039.npz`
 
 # %%
 from pathlib import Path
@@ -150,7 +150,7 @@ def bilinear_to_cea(global_da: xr.DataArray, lat_pts: np.ndarray, lon_pts: np.nd
 # ## Per-horizon: load DestinE NetCDF → daily-to-monthly → period-mean → CEA → TEI/PEI
 
 # %%
-HORIZONS = ["2046_2055", "2076_2085"]
+HORIZONS = ["2020_2029", "2030_2039"]
 
 
 def _select_var(ds: xr.Dataset, candidates: list[str]) -> xr.DataArray:

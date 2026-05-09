@@ -22,11 +22,11 @@ import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
 # Produces:
 #
 #   * `figures/projection_species_rank.png` — two-panel ranked bar chart
-#     (mid-century left, end-of-century right) of per-species posterior
+#     (near-term left, mid-term right) of per-species posterior
 #     mean extirpation probability with 95 % HDI error bars.
-#   * `figures/projection_risk_map_2046_2055.png` — Iberia map of
-#     community-mean (over species) extirpation probability.
-#   * `figures/projection_risk_map_2076_2085.png` — same, end-of-century.
+#   * `figures/projection_risk_map_2020_2029.png` — Iberia map of
+#     community-mean (over species) extirpation probability (near-term).
+#   * `figures/projection_risk_map_2030_2039.png` — same, mid-term.
 #   * `figures/projection_summary.png` — combined panel for the Jupyter
 #     Book / nanopub Outcome draft (rank chart + the more impactful
 #     map).
@@ -58,10 +58,10 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 with open(RESULTS_DIR / "projection_headline.json") as f:
     summary = json.load(f)
 
-HORIZONS = ["2046_2055", "2076_2085"]
+HORIZONS = ["2020_2029", "2030_2039"]
 HORIZON_TITLES = {
-    "2046_2055": "Mid-century (2046–2055)",
-    "2076_2085": "End-of-century (2076–2085)",
+    "2020_2029": "Near-term (2020–2029)",
+    "2030_2039": "Mid-term (2030–2039)",
 }
 
 per_cell = {}
@@ -146,11 +146,11 @@ def _plot_rank(ax, records, title, color):
 
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(13, 9), sharey=False)
-records_mid = summary["horizons"]["2046_2055"]["species_ranked"]
-records_end = summary["horizons"]["2076_2085"]["species_ranked"]
+records_mid = summary["horizons"]["2020_2029"]["species_ranked"]
+records_end = summary["horizons"]["2030_2039"]["species_ranked"]
 
-_plot_rank(axes[0], records_mid, HORIZON_TITLES["2046_2055"], TEAL)
-_plot_rank(axes[1], records_end, HORIZON_TITLES["2076_2085"], ORANGE)
+_plot_rank(axes[0], records_mid, HORIZON_TITLES["2020_2029"], TEAL)
+_plot_rank(axes[1], records_end, HORIZON_TITLES["2030_2039"], ORANGE)
 fig.suptitle(
     "Iberian Bombus extirpation risk under DestinE Climate DT SSP3-7.0\n"
     f"Top-3 most-vulnerable per horizon highlighted in gold "
@@ -227,7 +227,7 @@ if per_cell:
         key=lambda h: float(np.nanmax(per_cell[h])) if np.isfinite(np.nanmax(per_cell[h])) else 0.0,
     )
 else:
-    impactful = "2076_2085"
+    impactful = "2030_2039"
 print(f"Combined panel uses {impactful} for the map.")
 
 fig = plt.figure(figsize=(15, 7.5))
@@ -237,7 +237,7 @@ ax_rank = fig.add_subplot(gs[0, 0])
 records = summary["horizons"][impactful]["species_ranked"]
 _plot_rank(ax_rank, records,
            f"Species rank — {HORIZON_TITLES[impactful]}",
-           ORANGE if impactful == "2076_2085" else TEAL)
+           ORANGE if impactful == "2030_2039" else TEAL)
 
 if impactful in per_cell:
     ax_map = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())

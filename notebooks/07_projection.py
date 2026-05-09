@@ -60,7 +60,7 @@ OUT_DIR = PORT / "outputs_iberia"
 RESULTS_DIR = ROOT / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-HORIZONS = ["2046_2055", "2076_2085"]
+HORIZONS = ["2020_2029", "2030_2039"]
 N_DRAWS = 1000
 RNG = np.random.default_rng(20260509)
 

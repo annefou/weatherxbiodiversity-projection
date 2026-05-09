@@ -130,8 +130,8 @@ rule tier2:
     input:
         f"{RESULTS}/projection_headline.json",
         f"{FIGURES}/projection_species_rank.png",
-        f"{FIGURES}/projection_risk_map_2046_2055.png",
-        f"{FIGURES}/projection_risk_map_2076_2085.png",
+        f"{FIGURES}/projection_risk_map_2020_2029.png",
+        f"{FIGURES}/projection_risk_map_2030_2039.png",
         f"{FIGURES}/projection_summary.png",
 
 
@@ -145,10 +145,10 @@ rule destine_download:
         # 2m temperature (instantaneous, 4×/day) + total precipitation
         # (accumulated, 1×/day) per horizon — DestinE Climate DT has no
         # native daily max/min, derived from t2m hourly samples in 06.
-        f"{DATA_DESTINE}/destine_iberia_2046_2055_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2046_2055_tp.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2020_2029_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2020_2029_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2030_2039_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2030_2039_tp.nc",
     log:
         f"{RESULTS}/logs/05_destine_download.log",
     shell:
@@ -164,14 +164,14 @@ rule destine_download:
 # limits fixed.
 rule destine_clean:
     input:
-        f"{DATA_DESTINE}/destine_iberia_2046_2055_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2046_2055_tp.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2020_2029_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2020_2029_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2030_2039_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2030_2039_tp.nc",
         f"{PORT}/outputs_iberia/climate_tei_pei.npz",
     output:
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2046_2055.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2076_2085.npz",
+        f"{PORT}/outputs_iberia/climate_tei_pei_future_2020_2029.npz",
+        f"{PORT}/outputs_iberia/climate_tei_pei_future_2030_2039.npz",
     log:
         f"{RESULTS}/logs/06_destine_clean.log",
     shell:
@@ -191,8 +191,8 @@ rule projection:
         f"{RESULTS}/posterior_bambi.nc",
         f"{PORT}/outputs_iberia/dataGLMM_extinction.parquet",
         f"{PORT}/outputs_iberia/sampling_continent.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2046_2055.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2076_2085.npz",
+        f"{PORT}/outputs_iberia/climate_tei_pei_future_2020_2029.npz",
+        f"{PORT}/outputs_iberia/climate_tei_pei_future_2030_2039.npz",
     output:
         f"{RESULTS}/projection_headline.json",
     log:
@@ -211,8 +211,8 @@ rule projection_figures:
         f"{RESULTS}/projection_headline.json",
     output:
         f"{FIGURES}/projection_species_rank.png",
-        f"{FIGURES}/projection_risk_map_2046_2055.png",
-        f"{FIGURES}/projection_risk_map_2076_2085.png",
+        f"{FIGURES}/projection_risk_map_2020_2029.png",
+        f"{FIGURES}/projection_risk_map_2030_2039.png",
         f"{FIGURES}/projection_summary.png",
     log:
         f"{RESULTS}/logs/08_projection_figures.log",
