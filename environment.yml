@@ -36,13 +36,17 @@ dependencies:
   # These are required by notebooks/05_destine_download.py,
   # 06_destine_clean.py, 07_projection.py, 08_projection_figures.py.
   # The notebooks themselves are guarded by `_tier2_guard.py` and skip
-  # cleanly when DestinE credentials are absent, so installing these
+  # cleanly when DestinE credentials are absent, so installing them
   # on a non-DestinE host is safe but unused.
-  - earthkit-data            # polytope-backed access to DestinE Climate DT
-  - polytope-client          # explicit pin (earthkit-data plugin under the hood)
-  - cartopy                  # Iberia coastline maps for projection figures
+  - cartopy                  # Iberia coastline maps for projection figures (conda preferred — C/PROJ extension)
   - pip
   - pip:
     # snakemake on conda-forge fails to solve under setup-micromamba@v3 —
     # install via pip. See docs/cicd-conventions.md.
     - snakemake
+    # earthkit-data + polytope-client are pip-only on the DestinE
+    # Jupyter image (conda-forge solver can't satisfy them in the
+    # destine_climate_dt platform image as of 2026-05). Install via pip
+    # to keep the env reproducible on both DestinE and a local Mac.
+    - earthkit-data
+    - polytope-client

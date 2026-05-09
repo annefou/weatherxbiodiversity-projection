@@ -135,7 +135,17 @@ for horizon_name, (start, end) in HORIZONS.items():
     print(f"\n[fetch] {horizon_name}: {start} .. {end}")
     print(f"  request: {request}")
 
-    ds = ekd.from_source("polytope", request)
+    # CHECK: the second positional arg is the polytope **collection**
+    # (server namespace), distinct from the in-request "dataset" key.
+    # For Destination Earth Climate DT the canonical collection name
+    # at the time of writing is "destination-earth"; alternatives
+    # encountered in the wild include "destination-earth-climate-dt"
+    # and "destination-earth-data-lake". If you hit
+    # `polytope.api.exceptions.UnknownCollection`, swap the value.
+    POLYTOPE_COLLECTION = "destination-earth"
+    print(f"  polytope collection: {POLYTOPE_COLLECTION}")
+
+    ds = ekd.from_source("polytope", POLYTOPE_COLLECTION, request)
 
     # earthkit-data returns a fieldlist; convert to xarray for NetCDF I/O.
     # CHECK: the to_xarray() accessor may need keyword args (e.g.
