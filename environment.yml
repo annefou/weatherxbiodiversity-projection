@@ -1,0 +1,43 @@
+# Single source of truth for the runtime — used by local dev, Docker, and CI.
+# Add every dependency a notebook imports here. Local "kitchen-sink" envs
+# (e.g. pangeo) hide missing deps; CI builds strictly from this file and will
+# silently produce empty notebook cells if anything is missing.
+name: "{{REPO_NAME}}"
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  # --- core scientific stack ---
+  - numpy
+  - pandas>=2.0
+  - xarray>=2024.6
+  - scipy
+  - matplotlib
+  - pyarrow
+  # --- notebook execution + Jupyter Book ---
+  - jupytext
+  - jupyterlab
+  - nbclient
+  - ipykernel
+  # --- replace/extend with the deps your replication needs ---
+  # Examples (uncomment as needed):
+  # - statsmodels             # GLM/GLMM regression
+  # - scikit-learn            # classical ML
+  # - pyproj                  # CRS + map projections
+  # - cartopy                 # geographic plotting
+  # - netcdf4                 # NetCDF I/O
+  # - cdsapi                  # Copernicus Climate Data Store
+  # - copernicusmarine        # Copernicus Marine Service
+  # - healpy                  # HEALPix (use nest=True — see DOMAIN.md)
+  # - rasterio                # raster I/O
+  # - geopandas               # vector I/O
+  # - dask                    # out-of-core / parallel
+  - pip
+  - pip:
+    # snakemake on conda-forge fails to solve under setup-micromamba@v3 —
+    # install via pip. See docs/cicd-conventions.md.
+    - snakemake
+    # Add pip-only deps here, e.g.:
+    # - pygbif
+    # - polytope-client       # Destination Earth Climate DT
+    # - earthkit-data

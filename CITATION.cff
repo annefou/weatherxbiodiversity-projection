@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: "{{REPO_NAME}}"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: "{{AUTHOR_FAMILY}}"
+    given-names: "{{AUTHOR_GIVEN}}"
+    orcid: "{{AUTHOR_ORCID}}"
+    affiliation: "{{AUTHOR_AFFILIATION}}"
+repository-code: "https://github.com/{{REPO_ORG}}/{{REPO_NAME}}"
+license: MIT
+version: "0.1.0"
+date-released: "{{RELEASE_DATE}}"
+# After your first GitHub release the Zenodo integration mints a concept DOI.
+# Replace this once available (run /init-template again or edit by hand):
+doi: "{{ZENODO_DOI}}"
+identifiers:
+  - type: doi
+    value: "{{ZENODO_DOI}}"
+    description: "Concept DOI (resolves to the latest version)"
+keywords:
+  - replication
+  - reproducibility
+  - FORRT
+  - nanopublication
+  - Science-Live
+references:
+  - type: article
+    title: "{{PAPER_TITLE}}"
+    authors:
+      - family-names: "{{PAPER_AUTHOR_FAMILY}}"
+        given-names: "{{PAPER_AUTHOR_GIVEN}}"
+    year: "{{PAPER_YEAR}}"
+    doi: "{{PAPER_DOI}}"

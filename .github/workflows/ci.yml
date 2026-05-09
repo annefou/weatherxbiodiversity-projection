@@ -1,0 +1,77 @@
+name: CI smoke run
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Smoke test: runs the replication pipeline end-to-end via the Snakefile.
+# Large inputs should be cached via actions/cache@v4 — see data/README.md.
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip CI if template has not been initialised or notebooks are scaffolds
+        id: guard
+        run: |
+          if grep -rln '{{[A-Z_]\+}}' . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.cff' --include='*.py' 2>/dev/null | grep -v '^./.claude/skills/init-template/' | head -1 > /dev/null; then
+            echo "::notice::Template placeholders detected ({{...}} tokens). Run /init-template inside Claude Code (or substitute manually) before CI runs meaningfully. Skipping the rest of this workflow."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif grep -lE 'raise NotImplementedError|"<dataset-name>"|# Example skeleton — adapt' notebooks/*.py 2>/dev/null | head -1 > /dev/null; then
+            echo "::notice::Notebooks are still in scaffold state — replace placeholders in notebooks/*.py with your actual replication code (Phase 2). The Snakefile rule outputs will not be produced until then. Skipping pipeline run."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Micromamba
+        if: steps.guard.outputs.skip != 'true'
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: environment.yml
+          environment-name: ${{ github.event.repository.name }}
+          init-shell: bash
+          cache-environment: true
+
+      # ----- credentials (uncomment + add the matching GitHub secret) -----
+      #
+      # - name: Set up Copernicus Marine credentials
+      #   if: ${{ secrets.COPERNICUS_CREDENTIALS_BASE64 != '' }}
+      #   run: |
+      #     mkdir -p ~/.copernicusmarine
+      #     echo "${{ secrets.COPERNICUS_CREDENTIALS_BASE64 }}" | base64 -d \
+      #       > ~/.copernicusmarine/.copernicusmarine-credentials
+      #
+      # - name: Set up CDS credentials
+      #   if: ${{ secrets.CDSAPI_KEY != '' }}
+      #   run: |
+      #     echo "url: https://cds.climate.copernicus.eu/api/v2" > ~/.cdsapirc
+      #     echo "key: ${{ secrets.CDSAPI_KEY }}" >> ~/.cdsapirc
+
+      # ----- data caching (uncomment + adjust path/key) -----
+      #
+      # - name: Cache input data
+      #   id: cache_data
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: data/raw
+      #     key: input-data-v1
+
+      - name: Run pipeline
+        if: steps.guard.outputs.skip != 'true'
+        shell: micromamba-shell {0}
+        run: snakemake --cores 1
+
+      - name: Upload results
+        if: always() && steps.guard.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-outputs
+          path: |
+            results/
+            figures/
