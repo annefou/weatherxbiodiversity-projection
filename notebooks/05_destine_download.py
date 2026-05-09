@@ -107,16 +107,27 @@ MIN_BYTES = 1_000_000  # 1 MB
 # %%
 def _build_request(start_date: str, end_date: str, *,
                    param: str, time: str, encoding: str) -> dict:
-    """Polytope request body. ``encoding`` is informational only —
-    it is the section of the catalogue (instantaneous / accumulated)
-    we're querying, used to keep documentation honest."""
+    """Polytope request body, aligned with the verified-working
+    DestinE Climate DT request template provided in the platform
+    documentation. ``encoding`` is informational only — the section
+    of the catalogue (instantaneous / accumulated) we're querying.
+
+    Required keys for SSP3-7.0 retrieval (verified 2026-05-09):
+      expver='0001', generation='1', realization='1',
+      model='IFS-NEMO', resolution='standard'.
+    Without these the request expands to the right cardinality but
+    matches no archived data (MARS returns "0 messages retrieved").
+    """
     return {
         "class": "d1",                          # DestinE
         "dataset": "climate-dt",                # Climate DT
         "activity": "ScenarioMIP",
         "experiment": "SSP3-7.0",
-        "model": "ICON",                        # ICON DKRZ run; alt: IFS-NEMO
-        "resolution": "high",
+        "expver": "0001",                       # experiment version (required)
+        "generation": "1",                      # model generation (required)
+        "realization": "1",                     # ensemble member (required)
+        "model": "IFS-NEMO",                    # IFS-NEMO has SSP3-7.0; ICON did not match
+        "resolution": "standard",               # 'standard' is the archived resolution
         "type": "fc",
         "stream": "clte",                       # Climate experimental
         "levtype": "sfc",                       # surface fields
