@@ -75,6 +75,7 @@ rule analysis:
     output:
         f"{RESULTS}/headline_statistic.json",
         f"{RESULTS}/glmm_coefficients.csv",
+        f"{RESULTS}/posterior_bambi.nc",
         f"{PORT}/outputs_iberia/posterior_vb_summary.csv",
         f"{PORT}/outputs_iberia/dataGLMM_extinction.parquet",
     log:

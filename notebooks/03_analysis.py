@@ -65,19 +65,25 @@ def run(script: str, *, check: bool = True) -> int:
 
 
 # %% [markdown]
-# ## Build the GLMM design matrix
+# ## Bayesian GLMM (bambi / PyMC) — full posterior covariance
 #
 # `05_regression.py` assembles the `dataGLMM_extinction.parquet` table
 # from the three npz intermediates (presence/absence, sampling effort,
-# climate TEI/PEI) at line 158, then attempts a `bambi`/`pymc` Bayesian
-# fit. The Bayesian step fails on macOS (pytensor/CLT incompatibility,
-# documented in `05b`'s docstring) — but the parquet has already been
-# written by then, which is what `05b` needs. We therefore tolerate a
-# non-zero exit from `05_regression.py` and verify the parquet
-# afterwards.
+# climate TEI/PEI) at line ~158, then runs a `bambi` / `pymc` MCMC fit
+# (NUTS, 2 chains × 2000 draws + 1000 tune) and writes the full
+# posterior to `posterior.nc`. Tier 2 (DestinE projection) samples
+# from this posterior to propagate coefficient uncertainty through the
+# future-climate projection.
+#
+# The upstream noted macOS pytensor / CLT issues; on current
+# pymc/pytensor (≥ 5.x) this is usually resolved. If the fit fails,
+# the wrapper falls through and the statsmodels VB run downstream still
+# produces a usable (but lower-fidelity) posterior summary.
 
 # %%
-run("05_regression.py", check=False)
+import shutil
+
+bambi_ok = run("05_regression.py", check=False) == 0
 
 parquet_path = OUT_DIR / "dataGLMM_extinction.parquet"
 if not parquet_path.exists():
@@ -87,6 +93,19 @@ if not parquet_path.exists():
     )
 print(f"\n[ok] {parquet_path.name} present "
       f"({parquet_path.stat().st_size:,} bytes)")
+
+# Promote the bambi posterior NetCDF into results/ so Tier 2 finds it
+# at a stable, committable path. soroye_port/outputs_iberia/ is
+# gitignored; results/posterior_bambi.nc is tracked.
+upstream_idata = OUT_DIR / "posterior.nc"
+results_idata = RESULTS_DIR / "posterior_bambi.nc"
+if bambi_ok and upstream_idata.exists():
+    shutil.copy2(upstream_idata, results_idata)
+    print(f"[ok] copied bambi idata → {results_idata} "
+          f"({results_idata.stat().st_size:,} bytes)")
+else:
+    print("[warn] bambi MCMC did not produce posterior.nc — "
+          "Tier 2 projection will need a successful Tier 1 bambi fit.")
 
 # %% [markdown]
 # ## Run the statsmodels variational-Bayes regression
@@ -130,6 +149,35 @@ verdict = "Replicated" if abs(z_diff) < 1.96 else "Diverges"
 # ## Write the comparison JSON
 
 # %%
+# MCMC marginal for sc_TEI_delta (full posterior covariance available
+# in results/posterior_bambi.nc for Tier 2). VB underestimates posterior
+# variance — this comparison documents the magnitude.
+mcmc_block = None
+if results_idata.exists():
+    import arviz as az
+    idata = az.from_netcdf(results_idata)
+    mcmc_summary = az.summary(idata, var_names=["sc_TEI_delta"], hdi_prob=0.95)
+    mcmc_mean = float(mcmc_summary.loc["sc_TEI_delta", "mean"])
+    mcmc_sd = float(mcmc_summary.loc["sc_TEI_delta", "sd"])
+    mcmc_hdi_low = float(mcmc_summary.loc["sc_TEI_delta", "hdi_2.5%"])
+    mcmc_hdi_high = float(mcmc_summary.loc["sc_TEI_delta", "hdi_97.5%"])
+    sd_inflation_factor = mcmc_sd / rep_sd if rep_sd else float("nan")
+    mcmc_block = {
+        "sc_TEI_delta_mean": mcmc_mean,
+        "sc_TEI_delta_sd": mcmc_sd,
+        "sc_TEI_delta_hdi95_low": mcmc_hdi_low,
+        "sc_TEI_delta_hdi95_high": mcmc_hdi_high,
+        "vb_sd_underestimation_factor": sd_inflation_factor,
+        "comment": (
+            "MCMC posterior SD vs statsmodels VB posterior SD — ratio > 1 "
+            "means VB underestimates uncertainty. Tier 2 samples 1000 draws "
+            "from this posterior."
+        ),
+    }
+    print(f"\nMCMC sc_TEI_delta: {mcmc_mean:+.3f} "
+          f"[{mcmc_hdi_low:+.3f}, {mcmc_hdi_high:+.3f}]  "
+          f"sd ratio MCMC/VB = {sd_inflation_factor:.2f}")
+
 report = {
     "replication": {
         "sc_TEI_delta_mean": rep_mean,
@@ -148,6 +196,7 @@ report = {
         "z_diff": float(z_diff),
         "verdict": verdict,
     },
+    "mcmc": mcmc_block,
 }
 
 out_path = RESULTS_DIR / "headline_statistic.json"

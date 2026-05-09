@@ -1,10 +1,10 @@
 {
   "replication": {
-    "sc_TEI_delta_mean": 0.4792207554485529,
-    "sc_TEI_delta_sd": 0.1090015091820982,
-    "sc_TEI_delta_ci95_low": 0.26557779745164045,
-    "sc_TEI_delta_ci95_high": 0.6928637134454654,
-    "p_2sided": 1.1003071726856106e-05
+    "sc_TEI_delta_mean": 0.4792208294580866,
+    "sc_TEI_delta_sd": 0.1090015194521973,
+    "sc_TEI_delta_ci95_low": 0.2655778513317799,
+    "sc_TEI_delta_ci95_high": 0.6928638075843933,
+    "p_2sided": 1.1003058312919478e-05
   },
   "upstream_v0_2_1": {
     "sc_TEI_delta_mean": 0.479,
@@ -13,7 +13,15 @@
     "sc_TEI_delta_ci95_high": 0.6926399999999999
   },
   "agreement": {
-    "z_diff": 0.0014320788442021989,
+    "z_diff": 0.0014325588893818154,
     "verdict": "Replicated"
+  },
+  "mcmc": {
+    "sc_TEI_delta_mean": 0.482,
+    "sc_TEI_delta_sd": 0.153,
+    "sc_TEI_delta_hdi95_low": 0.178,
+    "sc_TEI_delta_hdi95_high": 0.764,
+    "vb_sd_underestimation_factor": 1.4036501579879193,
+    "comment": "MCMC posterior SD vs statsmodels VB posterior SD \u2014 ratio > 1 means VB underestimates uncertainty. Tier 2 samples 1000 draws from this posterior."
   }
 }

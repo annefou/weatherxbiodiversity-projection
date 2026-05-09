@@ -37,6 +37,8 @@ reference/
 # Results — large numerical outputs (commit only summary CSVs you reference in figures)
 results/raw/
 results/logs/
+# Tier-1 bambi posterior (~5 MB NetCDF) IS tracked — Tier 2 samples from it.
+# results/posterior_bambi.nc
 
 # Docker
 docker-image.tar.gz

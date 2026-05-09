@@ -15,6 +15,14 @@ dependencies:
   - scipy
   - matplotlib
   - statsmodels              # variational-Bayes GLMM (BinomialBayesMixedGLM)
+  # --- Bayesian MCMC (full posterior covariance for Tier 2 sampling) ---
+  # arviz<0.22 because pymc 5.28 still does `from arviz import concat`,
+  # which was removed in arviz 0.22+ (1.x is the modular split). Pin
+  # arviz first; bambi/pymc/pytensor follow conda-forge's compatible
+  # selections.
+  - arviz<0.22
+  - bambi                    # high-level GLMM fit on top of pymc
+  - pymc                     # MCMC backend (NUTS via pytensor)
   - pyarrow                  # parquet I/O for dataGLMM intermediate
   - pyproj                   # cylindrical-equal-area projection
   - netcdf4                  # CRU TS NetCDF reading
