@@ -217,20 +217,20 @@ rule tier2:
         f"{FIGURES}/projection_summary.png",
 
 
-# ---------- 05: DestinE download ----------
-# Fetch SSP3-7.0 daily fields (tmax / tmin / total precip) for two
-# decade slices over the Iberian bounding box. NetCDFs land in
-# `data/destine/` and are gitignored — DestinE Climate DT is
-# licence-locked.
+# ---------- 05: DestinE GRIB retrieve (DestinE platform only) ----------
+# Polytope-only retrieve; writes raw global HEALPix-NESTED GRIBs to
+# data/destine/raw/. No xarray decode here — the DestinE platform's
+# eccodes HEALPix Geoiterator only supports RING ordering and fails on
+# NESTED. After this step the user transfers the GRIBs to local Mac;
+# 06 decodes locally with the eccodes Python API (no Geoiterator),
+# subsets to the Iberian HEALPix-NESTED nside=128 cells, and aggregates
+# to nside=64 via NESTED parent.
 rule destine_download:
     output:
-        # 2m temperature (instantaneous, 4×/day) + total precipitation
-        # (accumulated, 1×/day) per horizon — DestinE Climate DT has no
-        # native daily max/min, derived from t2m hourly samples in 06.
-        f"{DATA_DESTINE}/destine_iberia_2020_2029_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2020_2029_tp.nc",
-        f"{DATA_DESTINE}/destine_iberia_2030_2039_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2030_2039_tp.nc",
+        f"{DATA_DESTINE}/raw/destine_2020_2029_t2m.grib",
+        f"{DATA_DESTINE}/raw/destine_2020_2029_tp.grib",
+        f"{DATA_DESTINE}/raw/destine_2030_2039_t2m.grib",
+        f"{DATA_DESTINE}/raw/destine_2030_2039_tp.grib",
     log:
         f"{RESULTS}/logs/05_destine_download.log",
     shell:
@@ -246,14 +246,14 @@ rule destine_download:
 # limits fixed.
 rule destine_clean:
     input:
-        f"{DATA_DESTINE}/destine_iberia_2020_2029_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2020_2029_tp.nc",
-        f"{DATA_DESTINE}/destine_iberia_2030_2039_t2m.nc",
-        f"{DATA_DESTINE}/destine_iberia_2030_2039_tp.nc",
-        f"{PORT}/outputs_iberia/climate_tei_pei.npz",
+        f"{DATA_DESTINE}/raw/destine_2020_2029_t2m.grib",
+        f"{DATA_DESTINE}/raw/destine_2020_2029_tp.grib",
+        f"{DATA_DESTINE}/raw/destine_2030_2039_t2m.grib",
+        f"{DATA_DESTINE}/raw/destine_2030_2039_tp.grib",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
     output:
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2020_2029.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2030_2039.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.npz",
     log:
         f"{RESULTS}/logs/06_destine_clean.log",
     shell:
@@ -269,12 +269,15 @@ rule destine_clean:
 # 95% HDI to projection_headline.json and the per-cell community-mean
 # raster to results/projection_per_cell_<horizon>.npy (gitignored).
 rule projection:
+    # Apply the HEALPix-fit posterior (Phase C) to nside=64 future
+    # TEI/PEI from 06. Both fitting + projection happen on the same
+    # HEALPix-NESTED nside=64 substrate — no CEA dependency in Tier 2.
     input:
-        f"{RESULTS}/posterior_bambi.nc",
-        f"{PORT}/outputs_iberia/dataGLMM_extinction.parquet",
-        f"{PORT}/outputs_iberia/sampling_continent.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2020_2029.npz",
-        f"{PORT}/outputs_iberia/climate_tei_pei_future_2030_2039.npz",
+        f"{RESULTS}/posterior_bambi_healpix.nc",
+        f"{HPORT}/outputs_iberia/dataGLMM_extinction.parquet",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.npz",
     output:
         f"{RESULTS}/projection_headline.json",
     log:
