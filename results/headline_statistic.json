@@ -1,0 +1,19 @@
+{
+  "replication": {
+    "sc_TEI_delta_mean": 0.4792207554485529,
+    "sc_TEI_delta_sd": 0.1090015091820982,
+    "sc_TEI_delta_ci95_low": 0.26557779745164045,
+    "sc_TEI_delta_ci95_high": 0.6928637134454654,
+    "p_2sided": 1.1003071726856106e-05
+  },
+  "upstream_v0_2_1": {
+    "sc_TEI_delta_mean": 0.479,
+    "sc_TEI_delta_sd": 0.109,
+    "sc_TEI_delta_ci95_low": 0.26536,
+    "sc_TEI_delta_ci95_high": 0.6926399999999999
+  },
+  "agreement": {
+    "z_diff": 0.0014320788442021989,
+    "verdict": "Replicated"
+  }
+}

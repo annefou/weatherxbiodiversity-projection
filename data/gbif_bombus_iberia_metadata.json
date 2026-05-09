@@ -1,0 +1,15 @@
+{
+  "download_key": "0006204-260423192947929",
+  "doi": "10.15468/dl.3frmsq",
+  "doi_url": "https://doi.org/10.15468/dl.3frmsq",
+  "citation": "GBIF.org (2026-04-25) GBIF Occurrence Download https://doi.org/10.15468/dl.3frmsq",
+  "source_url": "https://api.gbif.org/v1/occurrence/download/request/0006204-260423192947929.zip",
+  "format": "SIMPLE_CSV (tab-separated)",
+  "local_path": "data/gbif_dl/0006204-260423192947929.csv",
+  "license": "CC-BY-NC-4.0 (per individual GBIF datasets)",
+  "upstream_repo": {
+    "name": "annefou/weatherxbiodiversity",
+    "version": "v0.2.1",
+    "concept_doi": "10.5281/zenodo.19756173"
+  }
+}

@@ -14,55 +14,89 @@
 # ---
 
 # %% [markdown]
-# # 02 — Data clean
+# # 02 — Data clean (Pass 1, Iberian baseline)
 #
-# This notebook tidies the raw data from `data/raw/` into an analysis-ready
-# format in `data/clean/`. Document every transformation: filters, renames,
-# joins, deduplications, projections, etc. The cleaned data is what the
-# analysis notebook consumes.
+# This notebook is a **thin orchestration wrapper** around the vendored
+# upstream pipeline in `soroye_port/`. It runs four upstream scripts in
+# order:
+#
+# 1. `01_clean_data_iberia.py` — clean GBIF Iberia download, apply
+#    Kerr-2015 species filter and IUCN exclusion list.
+# 2. `02_presence_absence.py` — build the 100km cylindrical-equal-area
+#    grid spanning N. America + Europe and infer presence/absence per
+#    (species × period × season).
+# 3. `03_sampling_continent.py` — per-cell sampling-effort raster
+#    (distinct LYIDs) and the continent code.
+# 4. `04_climate_tei_pei.py` — bilinearly interpolate CRU TS 3.24.01
+#    onto the CEA grid and compute Thermal & Precipitation Exposure
+#    Indices per species per cell per period.
+#
+# We do **not** re-port the science. The upstream scripts produced
+# `sc_TEI_delta = +0.479 [0.265, 0.694]` in v0.2.1 and we want to
+# reproduce that headline byte-for-byte before changing anything. The
+# only environment toggle is `OUT_SUBDIR=outputs_iberia`, which selects
+# the Phase-3 (Iberia) output directory inside `soroye_port/`.
 
 # %%
+import os
+import subprocess
+import sys
 from pathlib import Path
 
-import pandas as pd
-
 # %%
-RAW_DIR = Path("../data/raw")
-CLEAN_DIR = Path("../data/clean")
-CLEAN_DIR.mkdir(parents=True, exist_ok=True)
+ROOT = Path("..").resolve()
+PORT = ROOT / "soroye_port"
+OUT_DIR = PORT / "outputs_iberia"
+
+env = {**os.environ, "OUT_SUBDIR": "outputs_iberia"}
+
+
+def run(script: str) -> None:
+    print(f"\n=== {script} ===", flush=True)
+    subprocess.run(
+        [sys.executable, script],
+        cwd=PORT,
+        env=env,
+        check=True,
+    )
+
 
 # %% [markdown]
-# ## Load raw data
+# ## Run the four upstream cleaning + indexing scripts
 
 # %%
-# Replace with your actual file(s):
-# raw = pd.read_csv(RAW_DIR / "dataset.csv")
-# Or for NetCDF: ds = xr.open_dataset(RAW_DIR / "dataset.nc")
-raw = None
+run("01_clean_data_iberia.py")
+run("02_presence_absence.py")
+run("03_sampling_continent.py")
+run("04_climate_tei_pei.py")
 
 # %% [markdown]
-# ## Apply cleaning steps
-#
-# Document each step. Common patterns:
-#
-# - Filter by date range, region, or quality flag.
-# - Rename columns to a stable schema.
-# - Coerce dtypes.
-# - Drop or impute missing values, with a recorded count.
-# - Join external lookup tables (e.g. species → genus).
+# ## Summary of intermediate artefacts produced
 
 # %%
-# Example skeleton:
-# clean = (
-#     raw
-#     .pipe(lambda df: df[df["year"].between(2000, 2020)])
-#     .rename(columns={"raw_col": "clean_col"})
-#     .dropna(subset=["clean_col"])
-# )
-
-# %% [markdown]
-# ## Persist clean data
+expected = [
+    OUT_DIR / "bombus_clean.csv",
+    OUT_DIR / "presence_absence.npz",
+    OUT_DIR / "sampling_continent.npz",
+    OUT_DIR / "climate_tei_pei.npz",
+]
+print("\nIntermediate artefacts:")
+for p in expected:
+    if p.exists():
+        size = p.stat().st_size
+        print(f"  ok    {p.relative_to(ROOT)}  ({size:,} bytes)")
+    else:
+        print(f"  MISS  {p.relative_to(ROOT)}")
 
 # %%
-# Example: clean.to_parquet(CLEAN_DIR / "dataset.parquet")
-# print(f"Wrote {len(clean):,} rows to {CLEAN_DIR / 'dataset.parquet'}")
+# Quick row-count check on the cleaned occurrence table — gives the
+# user a one-line confirmation that the pipeline reached a sensible
+# place before the regression runs in 03_analysis.py.
+import pandas as pd  # noqa: E402
+
+clean_csv = OUT_DIR / "bombus_clean.csv"
+if clean_csv.exists():
+    df = pd.read_csv(clean_csv)
+    print(f"\nbombus_clean.csv → {len(df):,} rows, {df['species'].nunique()} species")
+    print(f"  periods present: {sorted(df['period'].dropna().unique().tolist())}")
+    print(f"  seasons present: {sorted(df['season'].dropna().unique().tolist())}")
