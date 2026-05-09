@@ -27,12 +27,17 @@ DATA = "data"
 RESULTS = "results"
 FIGURES = "figures"
 PORT = "soroye_port"
+HPORT = "healpix_port"
 
 
 rule all:
     input:
+        # CEA pipeline (Tier 1 reproduction)
         f"{FIGURES}/main_result.png",
         f"{RESULTS}/headline_statistic.json",
+        # HEALPix-NESTED nside=64 substrate-robustness branch (Phase C)
+        f"{FIGURES}/main_result_healpix.png",
+        f"{RESULTS}/headline_statistic_healpix.json",
 
 
 # ---------- 01: Data download ----------
@@ -114,6 +119,83 @@ rule figures:
         "cd " + NOTEBOOKS + " && "
         "jupytext --to notebook 04_figures.py && "
         "jupyter execute --inplace 04_figures.ipynb 2>&1 | tee ../{log}"
+
+
+# =============================================================================
+# Phase C — HEALPix-NESTED nside=64 substrate-robustness branch
+# =============================================================================
+# Parallel Tier-1 pipeline that reuses the same upstream data as the CEA
+# branch (GBIF Iberia + CRU TS), but runs the cleaning, presence/absence,
+# sampling, climate-TEI/PEI and regression on a HEALPix nside=64 NESTED
+# substrate (~92 km equal-area cells, scale-matched to Soroye's 100 km
+# CEA). The headline test is whether `sc_TEI_delta` recovers within
+# +-30% of weatherxbio v0.2.1's CEA value of +0.479 -- if yes, the
+# mechanism is shown to be substrate-robust.
+
+# ---------- 02h: Data clean (HEALPix substrate) ----------
+# Wraps healpix_port/01_clean_data_iberia_healpix.py +
+# 02_presence_absence_healpix.py + 03_sampling_continent_healpix.py +
+# 04_climate_tei_pei_healpix.py.
+rule data_clean_healpix:
+    input:
+        f"{DATA}/gbif_dl/0006204-260423192947929.csv",
+        directory("reference/Bumblebee_repo_wbombusdat/0_ClimateData"),
+    output:
+        f"{HPORT}/outputs_iberia/bombus_clean_healpix.csv",
+        f"{HPORT}/outputs_iberia/presence_absence_healpix.npz",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
+    log:
+        f"{RESULTS}/logs/02h_data_clean_healpix.log",
+    shell:
+        "mkdir -p $(dirname {log}) && "
+        "cd " + NOTEBOOKS + " && "
+        "jupytext --to notebook 02h_data_clean_healpix.py && "
+        "jupyter execute --inplace 02h_data_clean_healpix.ipynb 2>&1 | tee ../{log}"
+
+
+# ---------- 03h: Analysis (HEALPix substrate) ----------
+# Wraps healpix_port/05_regression_healpix.py +
+# 05b_regression_statsmodels_healpix.py and writes the
+# CEA-vs-HEALPix substrate-robustness JSON.
+rule analysis_healpix:
+    input:
+        f"{HPORT}/outputs_iberia/presence_absence_healpix.npz",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
+    output:
+        f"{RESULTS}/headline_statistic_healpix.json",
+        f"{RESULTS}/glmm_coefficients_healpix.csv",
+        f"{RESULTS}/posterior_bambi_healpix.nc",
+        f"{HPORT}/outputs_iberia/posterior_vb_summary.csv",
+        f"{HPORT}/outputs_iberia/dataGLMM_extinction.parquet",
+    log:
+        f"{RESULTS}/logs/03h_analysis_healpix.log",
+    shell:
+        "mkdir -p $(dirname {log}) && "
+        "cd " + NOTEBOOKS + " && "
+        "jupytext --to notebook 03h_analysis_healpix.py && "
+        "jupyter execute --inplace 03h_analysis_healpix.ipynb 2>&1 | tee ../{log}"
+
+
+# ---------- 04h: Figures (HEALPix substrate) ----------
+# Side-by-side forest plot: weatherxbio v0.2.1 CEA published values
+# (left, embedded inline) vs this run's HEALPix nside=64 fit (right),
+# with `sc_TEI_delta` highlighted in gold and a small Iberia HEALPix
+# coverage map at the bottom.
+rule figures_healpix:
+    input:
+        f"{HPORT}/outputs_iberia/posterior_vb_summary.csv",
+        f"{RESULTS}/headline_statistic_healpix.json",
+    output:
+        f"{FIGURES}/main_result_healpix.png",
+    log:
+        f"{RESULTS}/logs/04h_figures_healpix.log",
+    shell:
+        "mkdir -p $(dirname {log}) && "
+        "cd " + NOTEBOOKS + " && "
+        "jupytext --to notebook 04h_figures_healpix.py && "
+        "jupyter execute --inplace 04h_figures_healpix.ipynb 2>&1 | tee ../{log}"
 
 
 # =============================================================================

@@ -1,0 +1,44 @@
+{
+  "healpix_fit": {
+    "nside": 64,
+    "depth": 6,
+    "scheme": "NESTED",
+    "n_cells_iberia": 110,
+    "n_cells_in_fit": 58,
+    "n_species": 31,
+    "sc_TEI_delta_mean": 0.5109207532354073,
+    "sc_TEI_delta_sd": 0.113429660193984,
+    "p_2sided": 6.6593364704825575e-06,
+    "hdi95_low": 0.173,
+    "hdi95_high": 0.802,
+    "marginal_R2": null
+  },
+  "weatherxbio_v0_2_1_cea": {
+    "sc_TEI_delta_mean": 0.479,
+    "sc_TEI_delta_sd": 0.109,
+    "ci95_low": 0.26536,
+    "ci95_high": 0.6926399999999999,
+    "source": "weatherxbio v0.2.1 / soroye_port/outputs_iberia/posterior_vb_summary.csv",
+    "framing": "external reference for substrate-robustness check (NOT this repo's local CEA rerun)"
+  },
+  "substrate_robustness": {
+    "sign_positive": true,
+    "significant_p_lt_05": true,
+    "magnitude_within_30pct_of_cea": true,
+    "all_three_pass": true,
+    "tolerance_band_mean": [
+      0.3353,
+      0.6227
+    ],
+    "verdict": "Substrate-robust",
+    "comment": "HEALPix nside=64 NESTED fit recovers sc_TEI_delta = +0.511 (p = 6.66e-06), within +-30% of weatherxbio v0.2.1's CEA value of +0.479 -- mechanism is substrate-robust at matched ~92 km cell scale."
+  },
+  "mcmc": {
+    "sc_TEI_delta_mean": 0.498,
+    "sc_TEI_delta_sd": 0.16,
+    "sc_TEI_delta_hdi95_low": 0.173,
+    "sc_TEI_delta_hdi95_high": 0.802,
+    "vb_sd_underestimation_factor": 1.410565805507773,
+    "comment": "MCMC posterior on HEALPix nside=64 substrate -- VB sd is a lower bound on true posterior uncertainty."
+  }
+}
