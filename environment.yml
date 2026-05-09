@@ -47,6 +47,14 @@ dependencies:
   # format only; the analytical grid is the 100 km CEA grid that the
   # upstream weatherxbio v0.2.0 GLMM was fitted on.
   - healpix-geo
+  # GRIB decoder for DestinE Climate DT raw retrieves (06_destine_clean
+  # decodes per-message via the eccodes Python API — bypasses cfgrib
+  # because DestinE GRIBs are HEALPix NESTED and the eccodes Geoiterator
+  # only supports RING ordering. We don't call the Geoiterator; we read
+  # the raw `values` arrays in stored NESTED order and use the
+  # precomputed Iberian pixel index directly.)
+  - eccodes                  # ECMWF GRIB C library (with Python bindings)
+  - python-eccodes           # explicit Python binding (sometimes split out)
   - pip
   - pip:
     # snakemake on conda-forge fails to solve under setup-micromamba@v3 —
