@@ -142,8 +142,13 @@ rule tier2:
 # licence-locked.
 rule destine_download:
     output:
-        f"{DATA_DESTINE}/destine_iberia_2046_2055.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085.nc",
+        # 2m temperature (instantaneous, 4×/day) + total precipitation
+        # (accumulated, 1×/day) per horizon — DestinE Climate DT has no
+        # native daily max/min, derived from t2m hourly samples in 06.
+        f"{DATA_DESTINE}/destine_iberia_2046_2055_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2046_2055_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2076_2085_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2076_2085_tp.nc",
     log:
         f"{RESULTS}/logs/05_destine_download.log",
     shell:
@@ -159,8 +164,10 @@ rule destine_download:
 # limits fixed.
 rule destine_clean:
     input:
-        f"{DATA_DESTINE}/destine_iberia_2046_2055.nc",
-        f"{DATA_DESTINE}/destine_iberia_2076_2085.nc",
+        f"{DATA_DESTINE}/destine_iberia_2046_2055_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2046_2055_tp.nc",
+        f"{DATA_DESTINE}/destine_iberia_2076_2085_t2m.nc",
+        f"{DATA_DESTINE}/destine_iberia_2076_2085_tp.nc",
         f"{PORT}/outputs_iberia/climate_tei_pei.npz",
     output:
         f"{PORT}/outputs_iberia/climate_tei_pei_future_2046_2055.npz",

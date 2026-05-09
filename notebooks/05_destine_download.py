@@ -81,35 +81,48 @@ HORIZONS = {
 MIN_BYTES = 1_000_000  # 1 MB
 
 # %% [markdown]
-# ## DestinE Climate DT request template
+# ## DestinE Climate DT request — known constraints
 #
-# The keys below are the typical shape of a polytope request against
-# the DestinE Climate DT catalogue. **Treat the param identifiers and
-# stream/resolution choices as placeholders to verify on the DestinE
-# platform.**
+# Verified against the official catalogue
+# (`DestinE ClimateDT Parameters - DGOV` Confluence page, retrieved
+# 2026-05). Two findings shape this request:
+#
+# 1. **DestinE Climate DT has NO daily max/min temperature encodings.**
+#    Sections 4 and 5 of the catalogue explicitly state "There are no
+#    maximum/minimum encodings for this dataset." We therefore fetch
+#    hourly 2m temperature (`param=167`, instantaneous, levtype=sfc)
+#    and derive daily max/min in `06_destine_clean.py`. To keep the
+#    extract size manageable we sample 4 times/day
+#    (00, 06, 12, 18 UTC) — that captures the diurnal range well
+#    enough for a Soroye-style monthly-statistics analysis.
+# 2. **Total precipitation (`param=228`) lives in section 3
+#    (accumulated encodings), distinct from instantaneous fields.**
+#    Mixing instantaneous (167) and accumulated (228) in one
+#    polytope request is brittle on MARS — we issue them as TWO
+#    separate requests below.
+#
+# All values below are catalogue-verified (model=ICON, levtype=sfc,
+# stream=clte, type=fc) for the SSP3-7.0 ScenarioMIP run.
 
 # %%
-print(
-    "CHECK: verify DestinE catalogue keys before first run. The keys "
-    "below are placeholders. See: https://destine.ecmwf.int/ for the "
-    "current Climate DT catalogue."
-)
-
-
-def _build_request(start_date: str, end_date: str) -> dict:
-    """Polytope request body. CHECK every key on first DestinE run."""
+def _build_request(start_date: str, end_date: str, *,
+                   param: str, time: str, encoding: str) -> dict:
+    """Polytope request body. ``encoding`` is informational only —
+    it is the section of the catalogue (instantaneous / accumulated)
+    we're querying, used to keep documentation honest."""
     return {
-        "class": "d1",                    # CHECK: DestinE Climate DT class
-        "dataset": "climate-dt",          # CHECK: dataset identifier
-        "activity": "ScenarioMIP",        # CHECK: activity (CMIP-aligned)
-        "experiment": "SSP3-7.0",         # CHECK: experiment label
-        "model": "ICON",                  # CHECK: model — ICON or IFS-NEMO
-        "resolution": "high",             # CHECK: high vs standard
-        "type": "fc",                     # CHECK: forecast type
-        "stream": "clte",                 # CHECK: climate (clte) vs other
-        "param": "165/166/167",           # CHECK: tmax / tmin / total precip
+        "class": "d1",                          # DestinE
+        "dataset": "climate-dt",                # Climate DT
+        "activity": "ScenarioMIP",
+        "experiment": "SSP3-7.0",
+        "model": "ICON",                        # ICON DKRZ run; alt: IFS-NEMO
+        "resolution": "high",
+        "type": "fc",
+        "stream": "clte",                       # Climate experimental
+        "levtype": "sfc",                       # surface fields
+        "param": param,                         # 167 (2t) or 228 (tp)
         "date": f"{start_date}/to/{end_date}",
-        "time": "0000",
+        "time": time,                           # 4-times/day for 167; '0000' for 228
         "area": [
             IBERIA_AREA["north"],
             IBERIA_AREA["west"],
@@ -119,47 +132,76 @@ def _build_request(start_date: str, end_date: str) -> dict:
     }
 
 
+# Per-variable request specs. Each horizon is fetched twice — once for
+# 2m temperature (instantaneous, 4 samples/day → derive daily max/min
+# in 06_destine_clean.py), once for total precipitation
+# (accumulated, daily 0000Z value gives 24-hour accumulation).
+VARIABLE_SPECS = [
+    {"param": "167", "time": "0000/0600/1200/1800",
+     "encoding": "instantaneous", "label": "t2m"},
+    {"param": "228", "time": "0000",
+     "encoding": "accumulated",   "label": "tp"},
+]
+
+
 # %% [markdown]
 # ## Fetch each horizon
 
 # %%
 import earthkit.data as ekd  # noqa: E402  (deferred to keep guard cheap)
 
+# Polytope server (LUMI-hosted DestinE) and collection ("destination-earth").
+# DestinE-issued tokens are NOT accepted by ECMWF's general
+# https://polytope.ecmwf.int — must use the LUMI URL below.
+POLYTOPE_COLLECTION = "destination-earth"
+POLYTOPE_ADDRESS = "https://polytope.lumi.apps.dte.destination-earth.eu"
+# Alternatives: "https://polytope.destination-earth.eu"
+#               "https://polytope-climate-dt.destination-earth.eu"
+
+print(f"polytope collection: {POLYTOPE_COLLECTION}")
+print(f"polytope address:    {POLYTOPE_ADDRESS}\n")
+
 for horizon_name, (start, end) in HORIZONS.items():
-    out_path = DATA_DIR / f"destine_iberia_{horizon_name}.nc"
-    if out_path.exists() and out_path.stat().st_size > MIN_BYTES:
-        print(f"[cached] {out_path.name}  ({out_path.stat().st_size:,} bytes)")
-        continue
+    for spec in VARIABLE_SPECS:
+        out_path = DATA_DIR / (
+            f"destine_iberia_{horizon_name}_{spec['label']}.nc"
+        )
+        if out_path.exists() and out_path.stat().st_size > MIN_BYTES:
+            print(f"[cached] {out_path.name}  "
+                  f"({out_path.stat().st_size:,} bytes)")
+            continue
 
-    request = _build_request(start, end)
-    print(f"\n[fetch] {horizon_name}: {start} .. {end}")
-    print(f"  request: {request}")
+        request = _build_request(
+            start, end,
+            param=spec["param"],
+            time=spec["time"],
+            encoding=spec["encoding"],
+        )
+        print(f"\n[fetch] {horizon_name} / {spec['label']} "
+              f"({spec['encoding']}): {start} .. {end}")
+        print(f"  request: {request}")
 
-    # CHECK: the second positional arg is the polytope **collection**
-    # (server namespace), distinct from the in-request "dataset" key.
-    # For Destination Earth Climate DT the canonical collection name
-    # at the time of writing is "destination-earth"; alternatives
-    # encountered in the wild include "destination-earth-climate-dt"
-    # and "destination-earth-data-lake". If you hit
-    # `polytope.api.exceptions.UnknownCollection`, swap the value.
-    POLYTOPE_COLLECTION = "destination-earth"
-    print(f"  polytope collection: {POLYTOPE_COLLECTION}")
+        ds = ekd.from_source(
+            "polytope",
+            POLYTOPE_COLLECTION,
+            request,
+            address=POLYTOPE_ADDRESS,
+        )
 
-    ds = ekd.from_source("polytope", POLYTOPE_COLLECTION, request)
+        # earthkit-data returns a fieldlist; convert to xarray for NetCDF I/O.
+        # CHECK: the to_xarray() accessor may need keyword args (e.g.
+        # ``time_dim_mode="forecast"``) depending on the request shape.
+        xa = ds.to_xarray()
 
-    # earthkit-data returns a fieldlist; convert to xarray for NetCDF I/O.
-    # CHECK: the to_xarray() accessor may need keyword args (e.g.
-    # ``time_dim_mode="forecast"``) depending on the request shape.
-    xa = ds.to_xarray()
+        print(f"  variables: {list(xa.data_vars)}")
+        print(f"  coords: {list(xa.coords)}")
 
-    print(f"  variables: {list(xa.data_vars)}")
-    print(f"  coords: {list(xa.coords)}")
+        xa.to_netcdf(out_path)
+        print(f"  wrote {out_path}  ({out_path.stat().st_size:,} bytes)")
 
-    xa.to_netcdf(out_path)
-    print(f"  wrote {out_path}  ({out_path.stat().st_size:,} bytes)")
-
-print("\nAll horizons present.")
+print("\nAll (horizon × variable) extracts present.")
 for horizon_name in HORIZONS:
-    p = DATA_DIR / f"destine_iberia_{horizon_name}.nc"
-    print(f"  {p}  exists={p.exists()}  "
-          f"size={p.stat().st_size if p.exists() else 0:,}")
+    for spec in VARIABLE_SPECS:
+        p = DATA_DIR / f"destine_iberia_{horizon_name}_{spec['label']}.nc"
+        print(f"  {p.name}  exists={p.exists()}  "
+              f"size={p.stat().st_size if p.exists() else 0:,}")
