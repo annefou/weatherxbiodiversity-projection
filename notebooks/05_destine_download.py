@@ -214,18 +214,25 @@ print("HEALPix nside=128 cells are NESTED children of the Tier-1 "
       "HEALPix nside=64 analytical grid (4:1 parent-child mapping).")
 
 # %%
-import earthkit.data as ekd  # noqa: E402  (deferred to keep guard cheap)
+# Bypass earthkit-data's polytope wrapper: this version on the DestinE
+# platform returns a StreamSingleSource that implements neither
+# ``to_xarray()`` nor ``save()``. Use the polytope client directly with
+# ``output_file=`` to land the GRIB on disk, then read it with cfgrib via
+# xarray. cfgrib + eccodes are part of the DestinE platform image; if
+# missing, ``pip install --user --no-deps cfgrib eccodes``.
+import tempfile  # noqa: E402
+import xarray as xr  # noqa: E402
+from polytope.api import Client  # noqa: E402
 
-# Polytope server (LUMI-hosted DestinE) and collection ("destination-earth").
-# DestinE-issued tokens are NOT accepted by ECMWF's general
-# https://polytope.ecmwf.int — must use the LUMI URL below.
 POLYTOPE_COLLECTION = "destination-earth"
 POLYTOPE_ADDRESS = "https://polytope.lumi.apps.dte.destination-earth.eu"
-# Alternatives: "https://polytope.destination-earth.eu"
-#               "https://polytope-climate-dt.destination-earth.eu"
+
+polytope_client = Client(address=POLYTOPE_ADDRESS)
 
 print(f"polytope collection: {POLYTOPE_COLLECTION}")
 print(f"polytope address:    {POLYTOPE_ADDRESS}\n")
+
+GRIB_TMP = Path(tempfile.gettempdir())
 
 for horizon_name, (start, end) in HORIZONS.items():
     for spec in VARIABLE_SPECS:
@@ -247,31 +254,19 @@ for horizon_name, (start, end) in HORIZONS.items():
               f"({spec['encoding']}): {start} .. {end}")
         print(f"  request: {request}")
 
-        ds = ekd.from_source(
-            "polytope",
-            POLYTOPE_COLLECTION,
-            request,
-            address=POLYTOPE_ADDRESS,
-        )
+        tmp_grib = GRIB_TMP / f"destine_{horizon_name}_{spec['label']}.grib"
+        if tmp_grib.exists():
+            tmp_grib.unlink()
 
-        # earthkit-data's polytope source returns a streaming GRIB
-        # source that does NOT implement ``to_xarray()`` directly
-        # (NotImplementedError on StreamSingleSource). Materialise via
-        # ``to_fieldlist()`` first; if that's also unavailable on this
-        # version, fall back to save-to-temp-grib + reload.
-        try:
-            fl = ds.to_fieldlist() if hasattr(ds, "to_fieldlist") else ds
-            xa = fl.to_xarray()
-        except (NotImplementedError, AttributeError):
-            import tempfile
-            tmp_grib = Path(tempfile.gettempdir()) / (
-                f"destine_{horizon_name}_{spec['label']}.grib"
-            )
-            ds.save(str(tmp_grib))
-            print(f"  fallback: streamed to {tmp_grib} "
-                  f"({tmp_grib.stat().st_size:,} bytes), reloading via 'file' source")
-            xa = ekd.from_source("file", str(tmp_grib)).to_xarray()
-            tmp_grib.unlink(missing_ok=True)
+        polytope_client.retrieve(
+            POLYTOPE_COLLECTION, request,
+            output_file=str(tmp_grib),
+            asynchronous=False,
+        )
+        print(f"  GRIB landed at {tmp_grib} "
+              f"({tmp_grib.stat().st_size:,} bytes)")
+
+        xa = xr.open_dataset(tmp_grib, engine="cfgrib")
 
         print(f"  variables: {list(xa.data_vars)}")
         print(f"  coords: {list(xa.coords)}")
@@ -306,6 +301,13 @@ for horizon_name, (start, end) in HORIZONS.items():
 
         xa_iberia.to_netcdf(out_path)
         print(f"  wrote {out_path}  ({out_path.stat().st_size:,} bytes)")
+
+        # Free the global GRIB temp file — only the Iberian subset NetCDF
+        # is retained on disk (DestinE redistribution licence boundary).
+        xa.close()
+        tmp_grib.unlink(missing_ok=True)
+        idx_file = tmp_grib.with_suffix(tmp_grib.suffix + ".idx")
+        idx_file.unlink(missing_ok=True)
 
 print("\nAll (horizon × variable) extracts present.")
 for horizon_name in HORIZONS:
