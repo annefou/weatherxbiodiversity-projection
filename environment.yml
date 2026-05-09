@@ -39,7 +39,14 @@ dependencies:
   # cleanly when DestinE credentials are absent, so installing them
   # on a non-DestinE host is safe but unused.
   - cartopy                  # Iberia coastline maps for projection figures (conda preferred — C/PROJ extension)
-  - healpy                   # HEALPix subset of DestinE IFS-NEMO global output (nside=128 NESTED) — see DOMAIN.md
+  # healpix-geo (NOT healpy) for the DestinE HEALPix→CEA boundary —
+  # healpy is non-geo-aware (cosmology-first; lon convention 0-360,
+  # no CRS handling) and accumulates small biases over decadal time
+  # series, which is unacceptable for biodiversity-precision
+  # climate-impact work over Iberia (DOMAIN.md). HEALPix is the INPUT
+  # format only; the analytical grid is the 100 km CEA grid that the
+  # upstream weatherxbio v0.2.0 GLMM was fitted on.
+  - healpix-geo
   - pip
   - pip:
     # snakemake on conda-forge fails to solve under setup-micromamba@v3 —

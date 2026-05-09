@@ -165,36 +165,63 @@ VARIABLE_SPECS = [
 # ## Fetch each horizon
 
 # %% [markdown]
-# ## Iberia HEALPix mask
+# ## Iberia HEALPix mask (input-side only)
 #
 # DestinE IFS-NEMO output is on HEALPix nside=128 NESTED (~196,608
-# global cells). We pre-compute the indices of cells whose centres fall
-# inside the Iberian bbox so we can subset in-process before writing the
-# NetCDF — saves ~200× disk space (Iberia has ~900 cells out of 196,608
-# global) and respects the DestinE redistribution licence (only the
-# Iberian subset ever lands on disk).
+# global cells). We use **`healpix-geo`** (not `healpy`) here because
+# `healpy` is non-geo-aware (cosmology-first; lon convention 0–360, no
+# CRS handling, no datum) and accumulates small biases that are
+# unacceptable for biodiversity-precision climate-impact work over
+# Iberia (`DOMAIN.md` § Biodiversity is high-precision climate-impact
+# science).
 #
-# Per DOMAIN.md: HEALPix indexing is **always NESTED** in this
-# project — `nest=True` everywhere.
+# **HEALPix is the INPUT format only.** This notebook subsets the
+# global HEALPix output to Iberian cells and writes the subset NetCDF.
+# The actual *analytical grid* is the 100 km CEA grid the upstream
+# weatherxbio v0.2.0 GLMM was fitted on — the HEALPix→CEA aggregation
+# happens at the import boundary in `06_destine_clean.py`. The GLMM
+# coefficients are applied on CEA cells (same grid they were fitted
+# on), preserving consistency with the validated upstream `sc_TEI_delta`.
+#
+# Per `DOMAIN.md`: HEALPix indexing is **always NESTED**.
 
 # %%
 import numpy as np  # noqa: E402
-import healpy as hp  # noqa: E402
+# CHECK: healpix-geo API. The exact symbol/function names may differ
+# in your installed version. The minimal contract we need is:
+#   - npix lookup for nside=128 NESTED  (==> 196,608 cells)
+#   - geo-aware cell-center lon/lat lookup, lon in [-180, 180]
+# If the installed package surfaces these under different names, swap
+# the imports below; the rest of the notebook is API-agnostic.
+import healpix_geo  # noqa: E402
 
-DESTINE_NSIDE = 128                            # IFS-NEMO 'standard' resolution
-DESTINE_NPIX = hp.nside2npix(DESTINE_NSIDE)    # 196,608
+DESTINE_NSIDE = 128
+DESTINE_NPIX = 12 * DESTINE_NSIDE * DESTINE_NSIDE   # 196,608 (HEALPix invariant)
 
+# CHECK: `healpix_geo.nested.cell_centroids(nside, ipix)` is the most
+# likely API; alternatives include `healpix_geo.HealpixGrid(...).cell_centers`
+# or `healpix_geo.lonlat(nside, ipix, scheme='nested')`. Adjust to match
+# your version on the DestinE platform.
 _all_pix = np.arange(DESTINE_NPIX)
-_lons, _lats = hp.pix2ang(DESTINE_NSIDE, _all_pix, nest=True, lonlat=True)
-# healpy returns lon in [0, 360]; Iberia spans 350°-360° + 0°-4° (handles
-# the Greenwich wrap explicitly).
-_lon_iberia = ((_lons >= (360 + IBERIA_AREA["west"])) | (_lons <= IBERIA_AREA["east"]))
-_lat_iberia = (_lats >= IBERIA_AREA["south"]) & (_lats <= IBERIA_AREA["north"])
-IBERIA_PIX = _all_pix[_lon_iberia & _lat_iberia]
+try:
+    _lons, _lats = healpix_geo.nested.cell_centroids(DESTINE_NSIDE, _all_pix)
+except AttributeError:
+    # Fallback shape: a HealpixGrid-class API
+    _grid = healpix_geo.HealpixGrid(nside=DESTINE_NSIDE, scheme="nested")
+    _lons, _lats = _grid.cell_centers(_all_pix)
+
+# healpix-geo is geo-aware → lon in [-180, 180], no Greenwich-wrap kludge
+_iberia_mask = (
+    (_lons >= IBERIA_AREA["west"])  & (_lons <= IBERIA_AREA["east"])
+    & (_lats >= IBERIA_AREA["south"]) & (_lats <= IBERIA_AREA["north"])
+)
+IBERIA_PIX = _all_pix[_iberia_mask]
 
 print(f"Iberia HEALPix nside={DESTINE_NSIDE} NESTED: "
       f"{len(IBERIA_PIX):,} cells / {DESTINE_NPIX:,} global "
       f"({100 * len(IBERIA_PIX) / DESTINE_NPIX:.2f}%)")
+print("HEALPix is INPUT format only — analytical grid is CEA "
+      "(aggregation happens in 06_destine_clean.py).")
 
 # %%
 import earthkit.data as ekd  # noqa: E402  (deferred to keep guard cheap)
