@@ -2,13 +2,13 @@
 
 > This is a working scratchpad for the paper-analysis phase. The output of this file feeds the Quote / AIDA / Claim drafts. It is not itself a nanopub.
 
-**Reference paper:** {{PAPER_TITLE}}
+**Reference paper:** Climate change contributes to widespread declines among bumble bees across continents
 
-**DOI:** {{PAPER_DOI}}
+**DOI:** 10.1126/science.aax8591
 
 **Authors:** _add._
 
-**Year:** {{PAPER_YEAR}}
+**Year:** 2020
 
 ## Headline claim
 

@@ -1,8 +1,8 @@
-# {{REPO_NAME}}
+# weatherxbiodiversity-projection
 
-[![CI](https://github.com/{{REPO_ORG}}/{{REPO_NAME}}/actions/workflows/ci.yml/badge.svg)](https://github.com/{{REPO_ORG}}/{{REPO_NAME}}/actions/workflows/ci.yml)
-[![Jupyter Book](https://github.com/{{REPO_ORG}}/{{REPO_NAME}}/actions/workflows/jupyter-book.yml/badge.svg)](https://{{REPO_ORG}}.github.io/{{REPO_NAME}}/)
-[![Docker](https://github.com/{{REPO_ORG}}/{{REPO_NAME}}/actions/workflows/docker.yml/badge.svg)](https://github.com/{{REPO_ORG}}/{{REPO_NAME}}/pkgs/container/{{REPO_NAME}})
+[![CI](https://github.com/annefou/weatherxbiodiversity-projection/actions/workflows/ci.yml/badge.svg)](https://github.com/annefou/weatherxbiodiversity-projection/actions/workflows/ci.yml)
+[![Jupyter Book](https://github.com/annefou/weatherxbiodiversity-projection/actions/workflows/jupyter-book.yml/badge.svg)](https://annefou.github.io/weatherxbiodiversity-projection/)
+[![Docker](https://github.com/annefou/weatherxbiodiversity-projection/actions/workflows/docker.yml/badge.svg)](https://github.com/annefou/weatherxbiodiversity-projection/pkgs/container/weatherxbiodiversity-projection)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://zenodo.org/badge/DOI/{{ZENODO_DOI}}.svg)]({{ZENODO_DOI}})
 [![FAIR4RS](https://img.shields.io/badge/FAIR4RS-conformant-brightgreen)](docs/fair4rs-checklist.md)
@@ -10,8 +10,8 @@
 [![Science Live](https://img.shields.io/badge/Science%20Live-nanopub%20chain-purple)](nanopubs/PUBLISHED.md)
 [![RO-Crate](https://img.shields.io/badge/RO--Crate-1.2-orange)](ro-crate-metadata.json)
 
-> **{{PAPER_TITLE}}** — replication study.
-> Reference paper: [{{PAPER_DOI}}](https://doi.org/{{PAPER_DOI}})
+> **Climate change contributes to widespread declines among bumble bees across continents** — replication study.
+> Reference paper: [10.1126/science.aax8591](https://doi.org/10.1126/science.aax8591)
 
 This is a self-contained replication of the headline claim of the reference paper. It produces a reproducible computational pipeline, a Zenodo-archived release with a citable DOI, and a FORRT-tagged nanopublication chain on the [Science Live platform](https://platform.sciencelive4all.org).
 
@@ -20,20 +20,20 @@ This is a self-contained replication of the headline claim of the reference pape
 ## Quick start
 
 ```bash
-git clone https://github.com/{{REPO_ORG}}/{{REPO_NAME}}.git
-cd {{REPO_NAME}}
+git clone https://github.com/annefou/weatherxbiodiversity-projection.git
+cd weatherxbiodiversity-projection
 mamba env create -f environment.yml
-mamba activate {{REPO_NAME}}
+mamba activate weatherxbiodiversity-projection
 snakemake --cores 1
 ```
 
 Or with Docker:
 
 ```bash
-docker run --rm ghcr.io/{{REPO_ORG}}/{{REPO_NAME}}:latest
+docker run --rm ghcr.io/annefou/weatherxbiodiversity-projection:latest
 ```
 
-The Jupyter Book version is at <https://{{REPO_ORG}}.github.io/{{REPO_NAME}}/>.
+The Jupyter Book version is at <https://annefou.github.io/weatherxbiodiversity-projection/>.
 
 ## Built from a template
 
@@ -115,7 +115,7 @@ For lower-level nanopub work — retraction, superseding, batch publishing — s
 If you use this work, please cite both:
 
 - This software: [`CITATION.cff`](CITATION.cff) → DOI [{{ZENODO_DOI}}]({{ZENODO_DOI}})
-- The original paper: [{{PAPER_DOI}}](https://doi.org/{{PAPER_DOI}})
+- The original paper: [10.1126/science.aax8591](https://doi.org/10.1126/science.aax8591)
 
 ## Acknowledgements
 

@@ -59,7 +59,7 @@ What was not tested? What might not generalise?
 ### Completion date (date picker, required)
 
 ```
-{{RELEASE_DATE}}
+2026-05-09
 ```
 
 ### Supporting sources (repeatable group, required ≥1)

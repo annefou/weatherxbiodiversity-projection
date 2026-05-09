@@ -2,7 +2,7 @@
 # Add every dependency a notebook imports here. Local "kitchen-sink" envs
 # (e.g. pangeo) hide missing deps; CI builds strictly from this file and will
 # silently produce empty notebook cells if anything is missing.
-name: "{{REPO_NAME}}"
+name: "weatherxbiodiversity-projection"
 channels:
   - conda-forge
 dependencies:

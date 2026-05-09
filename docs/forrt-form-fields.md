@@ -90,7 +90,7 @@ There are no other substantive fields below "Source URI" — only a "publish as 
 | Short URI suffix for outcome ID | text input, **required** | e.g. `my-outcome-01`. |
 | Plain-text label for the outcome | text input, **required** | Descriptive title. |
 | Search for a FORRT replication study | search/select, **required** | Pick the published Replication Study URI. |
-| Repository URL | text input, **required** | e.g. `https://github.com/{{REPO_ORG}}/{{REPO_NAME}}`. |
+| Repository URL | text input, **required** | e.g. `https://github.com/annefou/weatherxbiodiversity-projection`. |
 | Completion date | date picker, **required** | When the replication finished (ISO format). |
 | Validation status | dropdown, **required** | Vocabulary: typically `Validated` / `PartiallySupported` / `Contradicted`. Maps to CiTO intention in the Citation step (Validated → `cito:confirms`; PartiallySupported → `cito:qualifies`; Contradicted → `cito:disputes`). |
 | Confidence level | dropdown, **required** | Vocabulary not yet captured — request screenshot if you need exact values. |

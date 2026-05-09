@@ -1,16 +1,16 @@
 cff-version: 1.2.0
-title: "{{REPO_NAME}}"
+title: "weatherxbiodiversity-projection"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
-  - family-names: "{{AUTHOR_FAMILY}}"
-    given-names: "{{AUTHOR_GIVEN}}"
-    orcid: "{{AUTHOR_ORCID}}"
-    affiliation: "{{AUTHOR_AFFILIATION}}"
-repository-code: "https://github.com/{{REPO_ORG}}/{{REPO_NAME}}"
+  - family-names: "Fouilloux"
+    given-names: "Anne"
+    orcid: "https://orcid.org/0000-0002-1784-2920"
+    affiliation: "LifeWatch ERIC"
+repository-code: "https://github.com/annefou/weatherxbiodiversity-projection"
 license: MIT
 version: "0.1.0"
-date-released: "{{RELEASE_DATE}}"
+date-released: "2026-05-09"
 # After your first GitHub release the Zenodo integration mints a concept DOI.
 # Replace this once available (run /init-template again or edit by hand):
 doi: "{{ZENODO_DOI}}"
@@ -26,9 +26,9 @@ keywords:
   - Science-Live
 references:
   - type: article
-    title: "{{PAPER_TITLE}}"
+    title: "Climate change contributes to widespread declines among bumble bees across continents"
     authors:
-      - family-names: "{{PAPER_AUTHOR_FAMILY}}"
-        given-names: "{{PAPER_AUTHOR_GIVEN}}"
-    year: "{{PAPER_YEAR}}"
-    doi: "{{PAPER_DOI}}"
+      - family-names: "Soroye"
+        given-names: "Peter"
+    year: "2020"
+    doi: "10.1126/science.aax8591"

@@ -66,7 +66,7 @@ When writing notebook or script code that uses unfamiliar APIs, **run it before 
 
 ### Procedure
 
-- Try to run the code locally (`mamba env create -f environment.yml` then `mamba run -n {{REPO_NAME}} python notebooks/01_data_download.py` — the env name comes from `environment.yml`).
+- Try to run the code locally (`mamba env create -f environment.yml` then `mamba run -n weatherxbiodiversity-projection python notebooks/01_data_download.py` — the env name comes from `environment.yml`).
 - If a needed dep is missing, say "I haven't run this — would need to add `X` to `environment.yml`. Run it first?"
 - **Never describe untested code as "works" or "ready"** — say "written, untested" or "written, runs in the Docker container per the API docs, not yet executed."
 - This applies especially to code using libraries with version-specific APIs (h3 v3 vs v4, rhealpixdggs, dggrid4py, foscat versions).
