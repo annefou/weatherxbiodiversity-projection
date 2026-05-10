@@ -1,0 +1,166 @@
+{
+  "horizon": "2030_2039",
+  "n_species_total": 31,
+  "by_min_n": {
+    "1": {
+      "n_species": 31,
+      "variants": {
+        "a": {
+          "label": "Full GLMM \u03b7 (within-substrate)",
+          "spearman_rho": 0.27217741935483875,
+          "pearson_r": 0.14755552586854198,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "b": {
+          "label": "Main-effects only \u03b7 (within-substrate)",
+          "spearman_rho": 0.3971774193548388,
+          "pearson_r": 0.37583939249614723,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "c": {
+          "label": "Full \u03b7, shared CEA reference",
+          "spearman_rho": 0.27298387096774196,
+          "pearson_r": 0.1423673262861745,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "d": {
+          "label": "Mean future TEI (substrate-invariant)",
+          "spearman_rho": 0.6649193548387098,
+          "pearson_r": 0.7690223813348972,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "d2": {
+          "label": "Frac TEI_future>0.5 (substrate-invariant)",
+          "spearman_rho": 0.6627613406190701,
+          "pearson_r": 0.6924579168626268,
+          "top10_overlap": 8,
+          "top_k": 10
+        }
+      }
+    },
+    "5": {
+      "n_species": 27,
+      "variants": {
+        "a": {
+          "label": "Full GLMM \u03b7 (within-substrate)",
+          "spearman_rho": 0.5122100122100123,
+          "pearson_r": 0.43886119115815764,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "b": {
+          "label": "Main-effects only \u03b7 (within-substrate)",
+          "spearman_rho": 0.5195360195360195,
+          "pearson_r": 0.5048669884661814,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "c": {
+          "label": "Full \u03b7, shared CEA reference",
+          "spearman_rho": 0.4884004884004884,
+          "pearson_r": 0.41395584048502276,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "d": {
+          "label": "Mean future TEI (substrate-invariant)",
+          "spearman_rho": 0.6862026862026862,
+          "pearson_r": 0.796699818960142,
+          "top10_overlap": 6,
+          "top_k": 10
+        },
+        "d2": {
+          "label": "Frac TEI_future>0.5 (substrate-invariant)",
+          "spearman_rho": 0.7074476302331368,
+          "pearson_r": 0.7425691896553128,
+          "top10_overlap": 7,
+          "top_k": 10
+        }
+      }
+    },
+    "10": {
+      "n_species": 13,
+      "variants": {
+        "a": {
+          "label": "Full GLMM \u03b7 (within-substrate)",
+          "spearman_rho": 0.5934065934065934,
+          "pearson_r": 0.7214367991699295,
+          "top10_overlap": 9,
+          "top_k": 10
+        },
+        "b": {
+          "label": "Main-effects only \u03b7 (within-substrate)",
+          "spearman_rho": 0.967032967032967,
+          "pearson_r": 0.933926780002971,
+          "top10_overlap": 10,
+          "top_k": 10
+        },
+        "c": {
+          "label": "Full \u03b7, shared CEA reference",
+          "spearman_rho": 0.5164835164835164,
+          "pearson_r": 0.7021084863103008,
+          "top10_overlap": 9,
+          "top_k": 10
+        },
+        "d": {
+          "label": "Mean future TEI (substrate-invariant)",
+          "spearman_rho": 0.901098901098901,
+          "pearson_r": 0.9352601957913901,
+          "top10_overlap": 9,
+          "top_k": 10
+        },
+        "d2": {
+          "label": "Frac TEI_future>0.5 (substrate-invariant)",
+          "spearman_rho": 0.8846153846153846,
+          "pearson_r": 0.8972875120195607,
+          "top10_overlap": 9,
+          "top_k": 10
+        }
+      }
+    },
+    "20": {
+      "n_species": 10,
+      "variants": {
+        "a": {
+          "label": "Full GLMM \u03b7 (within-substrate)",
+          "spearman_rho": 0.7696969696969697,
+          "pearson_r": 0.8950734852136801,
+          "top10_overlap": 10,
+          "top_k": 10
+        },
+        "b": {
+          "label": "Main-effects only \u03b7 (within-substrate)",
+          "spearman_rho": 0.9757575757575757,
+          "pearson_r": 0.9420362126822764,
+          "top10_overlap": 10,
+          "top_k": 10
+        },
+        "c": {
+          "label": "Full \u03b7, shared CEA reference",
+          "spearman_rho": 0.5515151515151515,
+          "pearson_r": 0.8647757559082372,
+          "top10_overlap": 10,
+          "top_k": 10
+        },
+        "d": {
+          "label": "Mean future TEI (substrate-invariant)",
+          "spearman_rho": 0.8181818181818182,
+          "pearson_r": 0.8420145338999518,
+          "top10_overlap": 10,
+          "top_k": 10
+        },
+        "d2": {
+          "label": "Frac TEI_future>0.5 (substrate-invariant)",
+          "spearman_rho": 0.8303030303030302,
+          "pearson_r": 0.8133643585445826,
+          "top10_overlap": 10,
+          "top_k": 10
+        }
+      }
+    }
+  }
+}

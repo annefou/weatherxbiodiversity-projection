@@ -164,7 +164,7 @@ Run this list before cutting any GitHub release:
 - [ ] `environment.yml` lists every notebook import (`grep -h "^import\|^from" notebooks/*.py | sort -u`).
 - [ ] `LICENSE` carries the right author and year.
 - [ ] Release notes follow the Zenodo-description format (`docs/cicd-conventions.md` § Release notes are Zenodo descriptions).
-- [ ] If this is the first release: `CITATION.cff` `doi` field is left as `{{ZENODO_DOI}}` (the integration mints it on release; update afterwards).
+- [ ] If this is the first release: `CITATION.cff` `doi` field is left as `10.5281/zenodo.20113777` (the integration mints it on release; update afterwards).
 - [ ] If this is a subsequent release: `CITATION.cff` `doi` field carries the concept DOI from the first release.
 - [ ] FORRT chain (if any) is published; URIs are listed in `nanopubs/PUBLISHED.md` and embedded in the Jupyter Book.
 - [ ] Docker image builds and runs the snakemake target via `docker run --rm ghcr.io/annefou/weatherxbiodiversity-projection:latest`.

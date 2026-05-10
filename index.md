@@ -80,6 +80,6 @@ The pipeline notebooks are organised in the left-hand TOC into three tiers:
 
 If you use this work, please cite:
 
-- This software: [`CITATION.cff`](https://github.com/annefou/weatherxbiodiversity-projection/blob/main/CITATION.cff) → DOI [{{ZENODO_DOI}}]({{ZENODO_DOI}}).
+- This software: [`CITATION.cff`](https://github.com/annefou/weatherxbiodiversity-projection/blob/main/CITATION.cff) → DOI [10.5281/zenodo.20113777](https://doi.org/10.5281/zenodo.20113777).
 - The original paper: [10.1126/science.aax8591](https://doi.org/10.1126/science.aax8591).
 - The sibling substrate-extension and substrate-sensitivity repos via their own DOIs (see CITATION.cff `references`).

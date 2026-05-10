@@ -36,7 +36,7 @@ For releases, also update:
 
 - The root `Dataset` `datePublished` to the release date.
 - The root `Dataset` `version` (add this property at release time).
-- The Crate's `identifier` to the Zenodo concept DOI once it's minted (`{{ZENODO_DOI}}` placeholder is currently in `CITATION.cff` and `codemeta.json` — promote the value here too).
+- The Crate's `identifier` to the Zenodo concept DOI once it's minted (`10.5281/zenodo.20113777` placeholder is currently in `CITATION.cff` and `codemeta.json` — promote the value here too).
 
 ## Validating the Crate
 

@@ -26,13 +26,14 @@ jobs:
       - name: Skip if template has not been initialised
         id: guard
         run: |
-          # Look for any unresolved {{...}} placeholder OTHER than
-          # {{ZENODO_DOI}}, which is intentionally filled in only after the
-          # first GitHub release mints a Zenodo concept DOI.
+          # Look for any unresolved {{...}} placeholder. After the first
+          # release mints a Zenodo concept DOI and that DOI is substituted
+          # in across the repo, the placeholder set is empty, and this
+          # guard becomes a permanent sanity check against future template
+          # drift.
           UNRESOLVED=$(grep -rhoE '\{\{[A-Z_]+\}\}' . \
             --include='*.md' --include='*.yml' --include='*.yaml' \
             --include='*.json' --include='*.cff' --include='*.py' 2>/dev/null \
-            | grep -v '^{{ZENODO_DOI}}$' \
             | sort -u \
             | head -1)
           if [ -n "$UNRESOLVED" ]; then

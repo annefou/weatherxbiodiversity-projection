@@ -11,28 +11,18 @@
 URI of the Outcome published in step 05. Pull from `nanopubs/PUBLISHED.md`.
 
 ```
-
+<replace-with-published-Outcome-URI-from-step-05>
 ```
 
 ### List citations (repeatable group, required ≥1)
 
-#### Citation 1 — back to the original paper
+#### Citation 1 — back to the original paper (Soroye 2020)
 
 ##### Citation Type (dropdown)
 
-Choose based on the Outcome's validation status:
+- [x] **`confirms`**
 
-- Validated → `confirms`
-- PartiallySupported → `qualifies`
-- Contradicted → `disputes`
-
-For question-rooted chains where there is no original paper to confirm/dispute, use `usesMethodIn` or `citesAsAuthority` for the methodology paper(s).
-
-> **Note:** `replicates` is NOT in the Science Live dropdown (despite existing in upstream CiTO). When citing a notebook/tutorial that was directly reused, use **`credits`** instead.
-
-```
-
-```
+(Outcome verdict is Validated, which maps to CiTO `confirms` per `docs/forrt-form-fields.md`.)
 
 ##### DOI or other URL of the cited work (text input)
 
@@ -40,11 +30,37 @@ For question-rooted chains where there is no original paper to confirm/dispute, 
 https://doi.org/10.1126/science.aax8591
 ```
 
-#### Additional citations (optional)
+#### Citation 2 — extends the substrate-extension sibling chain
 
-If the Outcome cites methods papers, related replications, or upstream tools, add them here.
+##### Citation Type (dropdown)
 
-- _Type: ___ → URL: ___
+- [x] **`extends`**
+
+(The nside=128 sibling chain is a methodological substrate extension that confirms the same TEI mechanism at finer resolution; this Outcome's substrate-robustness conclusion is supported by both substrates jointly. Cite the nside=128 sibling's Outcome URI once published.)
+
+##### DOI or other URL of the cited work (text input)
+
+```
+<replace-with-nside128-sibling-Outcome-URI-from-its-PUBLISHED.md>
+```
+
+(Or: cite the sibling repo's Zenodo concept DOI: `<replace-with-nside128-Zenodo-concept-DOI>`.)
+
+#### Citation 3 — extends the methodological substrate-sensitivity sibling chain
+
+##### Citation Type (dropdown)
+
+- [x] **`extends`**
+
+(The substrate-sensitivity sibling chain documents the projection-time grid-coupling diagnostic and the recommended reporting protocol that this Outcome's per-species ranking is filtered against.)
+
+##### DOI or other URL of the cited work (text input)
+
+```
+<replace-with-substrate-sensitivity-Outcome-URI-from-its-PUBLISHED.md>
+```
+
+(Or: cite that repo's Zenodo concept DOI: `<replace-with-substrate-sensitivity-Zenodo-concept-DOI>`.)
 
 ## Publication note
 

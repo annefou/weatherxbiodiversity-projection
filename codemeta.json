@@ -8,8 +8,8 @@
   "dateModified": "2026-05-10",
   "license": "https://spdx.org/licenses/MIT",
   "codeRepository": "https://github.com/annefou/weatherxbiodiversity-projection",
-  "identifier": "{{ZENODO_DOI}}",
-  "@id": "{{ZENODO_DOI}}",
+  "identifier": "10.5281/zenodo.20113777",
+  "@id": "10.5281/zenodo.20113777",
   "programmingLanguage": {
     "@type": "ComputerLanguage",
     "name": "Python",
