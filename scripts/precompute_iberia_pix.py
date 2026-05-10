@@ -32,15 +32,24 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 W, E, S, N = -10.0, 4.0, 35.0, 44.0
 
 
+# WGS84 (not "sphere"): per the EOPF-DGGS legacy-converters reference
+# (legacy_converters/healpix_converters.py:340 + every settings file
+# uses {"ellipsoid": {"name": "wgs84"}}), the geo-aware HEALPix
+# conversion uses the WGS84 ellipsoid. The sphere↔WGS84 difference is
+# small per cell (~hundreds of metres) but compounds across decadal
+# climate-impact work — DOMAIN.md flags this explicitly.
+ELLIPSOID = "WGS84"
+
+
 def iberia_nside64() -> np.ndarray:
     """nside=64 NESTED cells whose centres fall in the Iberia bbox.
 
-    Matches the Tier-1 HEALPix analytical grid (Phase C: 110 cells).
+    Matches the Tier-1 HEALPix analytical grid (Phase C: ~110 cells).
     """
     depth = 6  # log2(64)
     npix = 12 * 64 * 64
     pix = np.arange(npix, dtype=np.int64)
-    lons, lats = healpix_geo.nested.healpix_to_lonlat(pix, depth)
+    lons, lats = healpix_geo.nested.healpix_to_lonlat(pix, depth, ELLIPSOID)
     # healpix-geo returns lon in [0, 360); wrap to [-180, 180]
     lons = np.where(lons > 180.0, lons - 360.0, lons)
     mask = (lons >= W) & (lons <= E) & (lats >= S) & (lats <= N)

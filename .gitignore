@@ -67,7 +67,12 @@ healpix_port/outputs_iberia/*
 # only the aggregated species-level summary JSON + the figures are committed.
 data/destine/
 soroye_port/outputs_iberia/*future*
+# Per-cell projection rasters: legacy npy + migrated CF NetCDF.
 results/projection_per_cell_*.npy
+results/projection_2020_2029.nc
+results/projection_2030_2039.nc
+# HEALPix Tier-2 future TEI/PEI rasters under the same DestinE licence.
+healpix_port/outputs_iberia/*future*_healpix.nc
 
 # Claude scratch
 .claude/.cache/

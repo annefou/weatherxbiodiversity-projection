@@ -46,6 +46,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 # %%
 ROOT = Path("..").resolve()
@@ -204,9 +205,9 @@ if results_idata.exists():
 # ## Iberia HEALPix substrate sanity counts (n_cells, n_species)
 
 # %%
-pa = np.load(OUT_DIR / "presence_absence_healpix.npz", allow_pickle=True)
-n_cells_iberia = int(pa["n_cells"][0])
-n_species = int(len(pa["species"]))
+pa = xr.open_dataset(OUT_DIR / "presence_absence_healpix.nc")
+n_cells_iberia = int(pa.sizes["cell"])
+n_species = int(pa.sizes["species"])
 
 data_ext = pd.read_parquet(parquet_path)
 n_cells_in_fit = int(data_ext["site"].nunique())

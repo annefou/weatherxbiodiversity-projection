@@ -142,9 +142,9 @@ rule data_clean_healpix:
         directory("reference/Bumblebee_repo_wbombusdat/0_ClimateData"),
     output:
         f"{HPORT}/outputs_iberia/bombus_clean_healpix.csv",
-        f"{HPORT}/outputs_iberia/presence_absence_healpix.npz",
-        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
+        f"{HPORT}/outputs_iberia/presence_absence_healpix.nc",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.nc",
     log:
         f"{RESULTS}/logs/02h_data_clean_healpix.log",
     shell:
@@ -160,9 +160,9 @@ rule data_clean_healpix:
 # CEA-vs-HEALPix substrate-robustness JSON.
 rule analysis_healpix:
     input:
-        f"{HPORT}/outputs_iberia/presence_absence_healpix.npz",
-        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
+        f"{HPORT}/outputs_iberia/presence_absence_healpix.nc",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.nc",
     output:
         f"{RESULTS}/headline_statistic_healpix.json",
         f"{RESULTS}/glmm_coefficients_healpix.csv",
@@ -250,10 +250,10 @@ rule destine_clean:
         f"{DATA_DESTINE}/raw/destine_2020_2029_tp.grib",
         f"{DATA_DESTINE}/raw/destine_2030_2039_t2m.grib",
         f"{DATA_DESTINE}/raw/destine_2030_2039_tp.grib",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.nc",
     output:
-        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.npz",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.npz",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.nc",
     log:
         f"{RESULTS}/logs/06_destine_clean.log",
     shell:
@@ -275,11 +275,13 @@ rule projection:
     input:
         f"{RESULTS}/posterior_bambi_healpix.nc",
         f"{HPORT}/outputs_iberia/dataGLMM_extinction.parquet",
-        f"{HPORT}/outputs_iberia/sampling_continent_healpix.npz",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.npz",
-        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.npz",
+        f"{HPORT}/outputs_iberia/sampling_continent_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.nc",
     output:
         f"{RESULTS}/projection_headline.json",
+        f"{RESULTS}/projection_2020_2029.nc",
+        f"{RESULTS}/projection_2030_2039.nc",
     log:
         f"{RESULTS}/logs/07_projection.log",
     shell:
@@ -294,6 +296,8 @@ rule projection:
 rule projection_figures:
     input:
         f"{RESULTS}/projection_headline.json",
+        f"{RESULTS}/projection_2020_2029.nc",
+        f"{RESULTS}/projection_2030_2039.nc",
     output:
         f"{FIGURES}/projection_species_rank.png",
         f"{FIGURES}/projection_risk_map_2020_2029.png",

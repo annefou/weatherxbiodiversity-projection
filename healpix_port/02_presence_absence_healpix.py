@@ -15,10 +15,12 @@ observation gets an explicit 0 (inferred absence).
 """
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 ROOT = Path(__file__).resolve().parent.parent
 HEALPIX_PORT = ROOT / 'healpix_port'
@@ -29,6 +31,7 @@ IN_CSV = OUT_DIR / 'bombus_clean_healpix.csv'
 NSIDE = 64
 DEPTH = 6
 NPIX = 12 * NSIDE * NSIDE          # 49,152
+ELLIPSOID = "WGS84"                # match DestinE Climate DT (per legacy-converters)
 
 IBERIA_LON_MIN, IBERIA_LON_MAX = -10.0, 4.0
 IBERIA_LAT_MIN, IBERIA_LAT_MAX = 35.0, 44.0
@@ -44,10 +47,10 @@ def _import_healpix_geo_nested():
 
 
 def pix_to_lonlat(ipix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Pix -> (lon, lat) cell-center, lon wrapped to [-180, 180]."""
+    """Pix -> (lon, lat) cell-center on WGS84 ellipsoid, lon wrapped to [-180, 180]."""
     nested = _import_healpix_geo_nested()
     ipix = np.asarray(ipix, dtype='uint64')
-    lon, lat = nested.healpix_to_lonlat(ipix, DEPTH)
+    lon, lat = nested.healpix_to_lonlat(ipix, DEPTH, ELLIPSOID)
     lon = np.where(lon > 180.0, lon - 360.0, lon)
     return lon, lat
 
@@ -176,28 +179,153 @@ prab_recent = per_period_max([prab['3_1'], prab['3_2'], prab['3_3']])
 
 
 # ---------------------------------------------------------------------------
-# 6. Save.
+# 6. Save as CF-compliant NetCDF.
 
-np.savez_compressed(
-    OUT_DIR / 'presence_absence_healpix.npz',
-    species=np.array(species_list),
-    period_seasons=np.array(period_seasons),
-    iberia_cells_hp=iberia_cells_hp.astype(np.uint64),
-    iberia_lon=iberia_lon.astype(np.float32),
-    iberia_lat=iberia_lat.astype(np.float32),
-    pre_baseline_seasons=np.stack([pre['0_1'], pre['0_2'], pre['0_3']]),
-    pre_recent_seasons=np.stack([pre['3_1'], pre['3_2'], pre['3_3']]),
-    prab_baseline_seasons=np.stack([prab['0_1'], prab['0_2'], prab['0_3']]),
-    prab_recent_seasons=np.stack([prab['3_1'], prab['3_2'], prab['3_3']]),
-    prab_baseline=prab_baseline,
-    prab_recent=prab_recent,
-    sprich_baseline=sprich_baseline,
-    sprich_recent=sprich_recent,
-    nside=np.array([NSIDE], dtype=np.int32),
-    depth=np.array([DEPTH], dtype=np.int32),
-    n_cells=np.array([n_cells], dtype=np.int32),
+# Stack 6 (period_season) x species x cell arrays from the per-season dicts.
+presence_psc = np.stack(
+    [pre[ps] for ps in period_seasons], axis=0
+).astype(np.float32)                                       # (6, n_spp, n_cells)
+prab_psc = np.stack(
+    [prab[ps] for ps in period_seasons], axis=0
+).astype(np.float32)
+
+# Float fields where 0 means "absence inferred" must keep NaN as
+# missing-data (CF-compliant via _FillValue) — float32 NaN already
+# in arrays. Integer species_richness gets a sentinel for missing.
+sprich_baseline_int = np.where(
+    np.isfinite(sprich_baseline), sprich_baseline, -1,
+).astype(np.int32)
+sprich_recent_int = np.where(
+    np.isfinite(sprich_recent), sprich_recent, -1,
+).astype(np.int32)
+
+ds = xr.Dataset(
+    data_vars={
+        'presence': (
+            ('period_season', 'species', 'cell'),
+            presence_psc,
+            {
+                'long_name': 'raw species presence per (period_season, species, cell)',
+                'description': (
+                    '1 = species observed in cell during period_season; '
+                    'NaN = unknown (no observation). Inferred absences '
+                    'are NOT applied here; see presence_absence.'
+                ),
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'presence_absence': (
+            ('period_season', 'species', 'cell'),
+            prab_psc,
+            {
+                'long_name': 'inferred presence/absence per (period_season, species, cell)',
+                'description': (
+                    '1 = species observed in cell during period_season; '
+                    '0 = inferred absence (some other Bombus seen in that '
+                    'cell-period at any season); NaN = unknown'
+                ),
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'prab_baseline': (
+            ('species', 'cell'),
+            prab_baseline.astype(np.float32),
+            {
+                'long_name': 'baseline-period (1901-1974) inferred presence/absence',
+                'description': 'per-species per-cell max over baseline seasons',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'prab_recent': (
+            ('species', 'cell'),
+            prab_recent.astype(np.float32),
+            {
+                'long_name': 'recent-period (2000-2014) inferred presence/absence',
+                'description': 'per-species per-cell max over recent seasons',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'species_richness_baseline': (
+            ('cell',),
+            sprich_baseline_int,
+            {
+                'long_name': 'number of species observed per cell in baseline period',
+                'units': 'species',
+                '_FillValue': np.int32(-1),
+            },
+        ),
+        'species_richness_recent': (
+            ('cell',),
+            sprich_recent_int,
+            {
+                'long_name': 'number of species observed per cell in recent period',
+                'units': 'species',
+                '_FillValue': np.int32(-1),
+            },
+        ),
+        'lon': (
+            ('cell',),
+            iberia_lon.astype(np.float32),
+            {
+                'long_name': 'HEALPix cell-centre longitude',
+                'standard_name': 'longitude',
+                'units': 'degrees_east',
+            },
+        ),
+        'lat': (
+            ('cell',),
+            iberia_lat.astype(np.float32),
+            {
+                'long_name': 'HEALPix cell-centre latitude',
+                'standard_name': 'latitude',
+                'units': 'degrees_north',
+            },
+        ),
+    },
+    coords={
+        'period_season': np.array(period_seasons, dtype='U5'),
+        'species': np.array(species_list, dtype=object),
+        'cell': iberia_cells_hp.astype(np.int64),
+    },
+    attrs={
+        'Conventions': 'CF-1.10',
+        'title': 'Iberian Bombus presence/absence on HEALPix nside=64 NESTED',
+        'source': 'Soroye et al. 2020 method ported to HEALPix substrate',
+        'history': (
+            f'Created {date.today().isoformat()} by '
+            'healpix_port/02_presence_absence_healpix.py'
+        ),
+        'healpix_nside': NSIDE,
+        'healpix_depth': DEPTH,
+        'healpix_scheme': 'NESTED',
+        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        'n_cells': n_cells,
+    },
 )
-print(f'\nSaved -> {OUT_DIR / "presence_absence_healpix.npz"}')
+
+ds['cell'].attrs.update({
+    'long_name': 'HEALPix NESTED pixel index (nside=64)',
+    'description': 'Iberian-mask cell indices into the global HEALPix-NESTED nside=64 sphere',
+})
+ds['species'].attrs.update({'long_name': 'Bombus species binomial epithet'})
+ds['period_season'].attrs.update({
+    'long_name': 'period (0=baseline 1901-1974, 3=recent 2000-2014) and season (1-3)',
+    'description': "Format '<period>_<season>'; periods are '0' (baseline) and '3' (recent)",
+})
+
+out_path = OUT_DIR / 'presence_absence_healpix.nc'
+encoding = {
+    'presence': {'zlib': True, 'complevel': 4},
+    'presence_absence': {'zlib': True, 'complevel': 4},
+    'prab_baseline': {'zlib': True, 'complevel': 4},
+    'prab_recent': {'zlib': True, 'complevel': 4},
+    'species_richness_baseline': {'zlib': True, 'complevel': 4},
+    'species_richness_recent': {'zlib': True, 'complevel': 4},
+    'lon': {'zlib': True, 'complevel': 4},
+    'lat': {'zlib': True, 'complevel': 4},
+}
+ds.to_netcdf(out_path, engine='netcdf4', encoding=encoding)
+print(f'\nSaved -> {out_path}')
 
 # ---------------------------------------------------------------------------
 # 7. Quick per-species summary.

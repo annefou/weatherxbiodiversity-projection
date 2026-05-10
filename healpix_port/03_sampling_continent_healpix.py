@@ -11,16 +11,18 @@ version.
 """
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 ROOT = Path(__file__).resolve().parent.parent
 HEALPIX_PORT = ROOT / 'healpix_port'
 OUT_DIR = HEALPIX_PORT / 'outputs_iberia'
 IN_CSV = OUT_DIR / 'bombus_clean_healpix.csv'
-PA_NPZ = OUT_DIR / 'presence_absence_healpix.npz'
+PA_NC = OUT_DIR / 'presence_absence_healpix.nc'
 
 # ---------------------------------------------------------------------------
 # 1. Load cleaned data and the Iberia cell list (the universe of sites).
@@ -28,9 +30,9 @@ PA_NPZ = OUT_DIR / 'presence_absence_healpix.npz'
 print('Loading cleaned data + Iberia cell list ...')
 df = pd.read_csv(IN_CSV)
 
-pa = np.load(PA_NPZ, allow_pickle=True)
-iberia_cells_hp = pa['iberia_cells_hp']
-n_cells = int(pa['n_cells'][0])
+pa = xr.open_dataset(PA_NC)
+iberia_cells_hp = pa['cell'].values.astype(np.uint64)
+n_cells = int(pa.sizes['cell'])
 print(f'  Iberia cells: {n_cells}, occurrences: {len(df):,}')
 
 # Map ipix -> dense Iberia index, mirroring script 02.
@@ -121,15 +123,105 @@ print(f'Total sampling (all 6 seasons): cells with sampling = '
       f'{int(np.isfinite(samp_total).sum()):,}, '
       f'total LYIDs = {int(np.nansum(samp_total)):,}')
 
-np.savez_compressed(
-    OUT_DIR / 'sampling_continent_healpix.npz',
-    samp_baseline=samp_baseline,
-    samp_recent=samp_recent,
-    samp_total=samp_total,
-    samp_seasons=samp_stack,
-    period_seasons=np.array(period_seasons),
-    continent=continent,
-    iberia_cells_hp=iberia_cells_hp.astype(np.uint64),
-    n_cells=np.array([n_cells], dtype=np.int32),
+# Continent: int8 with -1 sentinel for missing (NaN in float continent).
+continent_int8 = np.where(
+    np.isfinite(continent), continent, -1,
+).astype(np.int8)
+
+ds = xr.Dataset(
+    data_vars={
+        'sampling': (
+            ('period_season', 'cell'),
+            samp_stack.astype(np.float32),
+            {
+                'long_name': 'number of distinct LYID-equivalents per cell per period_season',
+                'units': '1',
+                'description': (
+                    'Per (period, season) count of unique '
+                    '(continent, lon, lat, species, LYID) combinations '
+                    'in the cleaned Bombus occurrence table. '
+                    'NaN where the cell was never sampled in any of '
+                    'the six period_seasons.'
+                ),
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'sampling_baseline': (
+            ('cell',),
+            samp_baseline.astype(np.float32),
+            {
+                'long_name': 'sampling effort summed across baseline-period seasons',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'sampling_recent': (
+            ('cell',),
+            samp_recent.astype(np.float32),
+            {
+                'long_name': 'sampling effort summed across recent-period seasons',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'sampling_total': (
+            ('cell',),
+            samp_total.astype(np.float32),
+            {
+                'long_name': 'total sampling effort summed over all six period_seasons',
+                'units': '1',
+                'description': (
+                    'Per-cell total LYID-count across all six (period, season) '
+                    'combinations; matches upstream R `sampling`.'
+                ),
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'continent': (
+            ('cell',),
+            continent_int8,
+            {
+                'long_name': 'continent index per cell (1=North America, 2=Europe)',
+                'flag_values': np.array([1, 2], dtype=np.int8),
+                'flag_meanings': 'north_america europe',
+                '_FillValue': np.int8(-1),
+            },
+        ),
+    },
+    coords={
+        'period_season': np.array(period_seasons, dtype='U5'),
+        'cell': iberia_cells_hp.astype(np.int64),
+    },
+    attrs={
+        'Conventions': 'CF-1.10',
+        'title': 'Per-cell sampling effort + continent on Iberian HEALPix nside=64 NESTED',
+        'source': 'Soroye et al. 2020 method ported to HEALPix substrate',
+        'history': (
+            f'Created {date.today().isoformat()} by '
+            'healpix_port/03_sampling_continent_healpix.py'
+        ),
+        'healpix_nside': 64,
+        'healpix_depth': 6,
+        'healpix_scheme': 'NESTED',
+        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        'n_cells': n_cells,
+    },
 )
-print(f'\nSaved -> {OUT_DIR / "sampling_continent_healpix.npz"}')
+ds['cell'].attrs.update({
+    'long_name': 'HEALPix NESTED pixel index (nside=64)',
+})
+ds['period_season'].attrs.update({
+    'long_name': 'period_season label',
+    'description': "Format '<period>_<season>'; periods 0=baseline, 3=recent.",
+})
+
+out_path = OUT_DIR / 'sampling_continent_healpix.nc'
+encoding = {
+    'sampling': {'zlib': True, 'complevel': 4},
+    'sampling_baseline': {'zlib': True, 'complevel': 4},
+    'sampling_recent': {'zlib': True, 'complevel': 4},
+    'sampling_total': {'zlib': True, 'complevel': 4},
+    'continent': {'zlib': True, 'complevel': 4},
+}
+ds.to_netcdf(out_path, engine='netcdf4', encoding=encoding)
+print(f'\nSaved -> {out_path}')

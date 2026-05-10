@@ -24,6 +24,7 @@ upstream; only the substrate (cell coordinates) changes.
 """
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -35,7 +36,7 @@ REF = ROOT / 'reference' / 'Bumblebee_repo_wbombusdat'
 CLIM_DIR = REF / '0_ClimateData'
 HEALPIX_PORT = ROOT / 'healpix_port'
 OUT_DIR = HEALPIX_PORT / 'outputs_iberia'
-PA_NPZ = OUT_DIR / 'presence_absence_healpix.npz'
+PA_NC = OUT_DIR / 'presence_absence_healpix.nc'
 
 # Period year sets (mirror upstream).
 BASELINE_YEARS = list(range(1901, 1975))
@@ -102,12 +103,13 @@ def bilinear_at_points(
 # 1. Load Iberia cell-centre table from script 02 output.
 
 print('Loading Iberia HEALPix cell-centre table ...')
-pa = np.load(PA_NPZ, allow_pickle=True)
-species = list(pa['species'])
-prab_baseline = pa['prab_baseline']                 # (n_spp, n_cells)
-iberia_lon = pa['iberia_lon'].astype(np.float64)    # cell-centre lon, [-180, 180]
-iberia_lat = pa['iberia_lat'].astype(np.float64)    # cell-centre lat
-n_cells = int(pa['n_cells'][0])
+pa = xr.open_dataset(PA_NC)
+species = [str(s) for s in pa['species'].values]
+prab_baseline = pa['prab_baseline'].values         # (n_spp, n_cells)
+iberia_lon = pa['lon'].values.astype(np.float64)   # cell-centre lon, [-180, 180]
+iberia_lat = pa['lat'].values.astype(np.float64)   # cell-centre lat
+iberia_cells_hp = pa['cell'].values.astype(np.uint64)
+n_cells = int(pa.sizes['cell'])
 n_spp = len(species)
 print(f'  {n_cells} cells, {n_spp} species')
 
@@ -218,25 +220,215 @@ PEI_delta = PEI_rc - PEI_bs
 # ---------------------------------------------------------------------------
 # 8. Save.
 
-np.savez_compressed(
-    OUT_DIR / 'climate_tei_pei_healpix.npz',
-    species=np.array(species),
-    avgtemp_bs=avgtemp_bs.astype(np.float32),
-    avgtemp_delta=avgtemp_delta.astype(np.float32),
-    avgprecip_bs=avgprecip_bs.astype(np.float32),
-    avgprecip_delta=avgprecip_delta.astype(np.float32),
-    TEI_bs=TEI_bs.astype(np.float32),
-    TEI_delta=TEI_delta.astype(np.float32),
-    PEI_bs=PEI_bs.astype(np.float32),
-    PEI_delta=PEI_delta.astype(np.float32),
-    T_min_spp=T_min_spp.astype(np.float32),
-    T_max_spp=T_max_spp.astype(np.float32),
-    P_min_spp=P_min_spp.astype(np.float32),
-    P_max_spp=P_max_spp.astype(np.float32),
-    iberia_cells_hp=pa['iberia_cells_hp'].astype(np.uint64),
-    n_cells=np.array([n_cells], dtype=np.int32),
+TEI_rc_arr = (TEI_bs + TEI_delta).astype(np.float32)
+PEI_rc_arr = (PEI_bs + PEI_delta).astype(np.float32)
+meanT_rc_arr = meanT_rc.astype(np.float32)
+meanP_rc_arr = meanP_rc.astype(np.float32)
+
+ds = xr.Dataset(
+    data_vars={
+        'tei_bs': (
+            ('species', 'cell'),
+            TEI_bs.astype(np.float32),
+            {
+                'long_name': 'Climatic Position Index (thermal) baseline 1901-1974',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'tei_rc': (
+            ('species', 'cell'),
+            TEI_rc_arr,
+            {
+                'long_name': 'Climatic Position Index (thermal) recent 2000-2014',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'tei_delta': (
+            ('species', 'cell'),
+            TEI_delta.astype(np.float32),
+            {
+                'long_name': 'Delta thermal CPI = recent minus baseline',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'pei_bs': (
+            ('species', 'cell'),
+            PEI_bs.astype(np.float32),
+            {
+                'long_name': 'Climatic Position Index (precipitation) baseline 1901-1974',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'pei_rc': (
+            ('species', 'cell'),
+            PEI_rc_arr,
+            {
+                'long_name': 'Climatic Position Index (precipitation) recent 2000-2014',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'pei_delta': (
+            ('species', 'cell'),
+            PEI_delta.astype(np.float32),
+            {
+                'long_name': 'Delta precipitation CPI = recent minus baseline',
+                'units': '1',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'T_min_spp': (
+            ('species',),
+            T_min_spp.astype(np.float32),
+            {
+                'long_name': 'species-specific cold thermal limit (5-lowest baseline monthly Tmin avg)',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'T_max_spp': (
+            ('species',),
+            T_max_spp.astype(np.float32),
+            {
+                'long_name': 'species-specific hot thermal limit (max of baseline monthly Tmax)',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'P_min_spp': (
+            ('species',),
+            P_min_spp.astype(np.float32),
+            {
+                'long_name': 'species-specific dry-period precipitation limit',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'P_max_spp': (
+            ('species',),
+            P_max_spp.astype(np.float32),
+            {
+                'long_name': 'species-specific wet-period precipitation limit',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'meanT_bs': (
+            ('cell',),
+            meanT_bs.astype(np.float32),
+            {
+                'long_name': 'baseline-period mean annual temperature',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'meanT_rc': (
+            ('cell',),
+            meanT_rc_arr,
+            {
+                'long_name': 'recent-period mean annual temperature',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'meanP_bs': (
+            ('cell',),
+            meanP_bs.astype(np.float32),
+            {
+                'long_name': 'baseline-period mean annual total precipitation',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'meanP_rc': (
+            ('cell',),
+            meanP_rc_arr,
+            {
+                'long_name': 'recent-period mean annual total precipitation',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        # Aliased convenience names (matching the legacy npz keys for
+        # downstream scripts that still refer to avgtemp_*).
+        'avgtemp_bs': (
+            ('cell',),
+            avgtemp_bs.astype(np.float32),
+            {
+                'long_name': 'baseline mean annual temperature (alias of meanT_bs)',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'avgtemp_delta': (
+            ('cell',),
+            avgtemp_delta.astype(np.float32),
+            {
+                'long_name': 'delta annual mean temperature (recent minus baseline)',
+                'units': 'degC',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'avgprecip_bs': (
+            ('cell',),
+            avgprecip_bs.astype(np.float32),
+            {
+                'long_name': 'baseline mean annual total precipitation (alias of meanP_bs)',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+        'avgprecip_delta': (
+            ('cell',),
+            avgprecip_delta.astype(np.float32),
+            {
+                'long_name': 'delta annual total precipitation (recent minus baseline)',
+                'units': 'mm',
+                '_FillValue': np.float32(np.nan),
+            },
+        ),
+    },
+    coords={
+        'species': np.array(species, dtype=object),
+        'cell': iberia_cells_hp.astype(np.int64),
+    },
+    attrs={
+        'Conventions': 'CF-1.10',
+        'title': (
+            'Climatic Position Index (TEI / PEI) per species per cell on '
+            'Iberian HEALPix nside=64 NESTED'
+        ),
+        'source': 'Soroye et al. 2020 method ported to HEALPix substrate',
+        'crs_source': 'CRU TS 3.24.01 (Soroye Figshare)',
+        'history': (
+            f'Created {date.today().isoformat()} by '
+            'healpix_port/04_climate_tei_pei_healpix.py'
+        ),
+        'healpix_nside': 64,
+        'healpix_depth': 6,
+        'healpix_scheme': 'NESTED',
+        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        'n_cells': n_cells,
+        'baseline_period': '1901-1974',
+        'recent_period': '2000-2014',
+    },
 )
-print(f'\nSaved -> {OUT_DIR / "climate_tei_pei_healpix.npz"}')
+ds['cell'].attrs.update({
+    'long_name': 'HEALPix NESTED pixel index (nside=64)',
+})
+ds['species'].attrs.update({'long_name': 'Bombus species binomial epithet'})
+
+out_path = OUT_DIR / 'climate_tei_pei_healpix.nc'
+encoding = {
+    name: {'zlib': True, 'complevel': 4}
+    for name in ds.data_vars
+}
+ds.to_netcdf(out_path, engine='netcdf4', encoding=encoding)
+print(f'\nSaved -> {out_path}')
 print(f'\navgtemp_bs range: {np.nanmin(avgtemp_bs):.2f}..{np.nanmax(avgtemp_bs):.2f} degC')
 print(f'avgtemp_delta range: {np.nanmin(avgtemp_delta):.2f}..{np.nanmax(avgtemp_delta):.2f} degC')
 print(f'TEI_delta range: {np.nanmin(TEI_delta):.3f}..{np.nanmax(TEI_delta):.3f}')

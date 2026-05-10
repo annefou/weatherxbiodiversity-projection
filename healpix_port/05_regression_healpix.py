@@ -28,6 +28,7 @@ warnings.filterwarnings('ignore')
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / 'healpix_port' / 'outputs_iberia'
@@ -36,28 +37,31 @@ OUT_DIR = ROOT / 'healpix_port' / 'outputs_iberia'
 # 1. Load intermediates from scripts 02, 03, 04.
 
 print('Loading HEALPix intermediates ...')
-pa = np.load(OUT_DIR / 'presence_absence_healpix.npz', allow_pickle=True)
-sc = np.load(OUT_DIR / 'sampling_continent_healpix.npz', allow_pickle=True)
-cl = np.load(OUT_DIR / 'climate_tei_pei_healpix.npz', allow_pickle=True)
+pa = xr.open_dataset(OUT_DIR / 'presence_absence_healpix.nc')
+sc = xr.open_dataset(OUT_DIR / 'sampling_continent_healpix.nc')
+cl = xr.open_dataset(OUT_DIR / 'climate_tei_pei_healpix.nc')
 
-species_list = list(pa['species'])
-prab_baseline = pa['prab_baseline']
-prab_recent = pa['prab_recent']
+species_list = [str(s) for s in pa['species'].values]
+prab_baseline = pa['prab_baseline'].values
+prab_recent = pa['prab_recent'].values
 
-sampling_baseline = sc['samp_baseline']
-sampling_recent = sc['samp_recent']
-sampling_total = sc['samp_total']
-continent = sc['continent']
-n_cells = int(pa['n_cells'][0])
+sampling_baseline = sc['sampling_baseline'].values
+sampling_recent = sc['sampling_recent'].values
+sampling_total = sc['sampling_total'].values
+# Continent is int8 with -1 as missing; convert to float w/ NaN to
+# preserve the upstream isnan-based gating.
+continent_int = sc['continent'].values.astype(np.int16)
+continent = np.where(continent_int < 0, np.nan, continent_int).astype(np.float32)
+n_cells = int(pa.sizes['cell'])
 
-avgtemp_bs = cl['avgtemp_bs']
-avgtemp_delta = cl['avgtemp_delta']
-avgprecip_bs = cl['avgprecip_bs']
-avgprecip_delta = cl['avgprecip_delta']
-TEI_bs = cl['TEI_bs']
-TEI_delta = cl['TEI_delta']
-PEI_bs = cl['PEI_bs']
-PEI_delta = cl['PEI_delta']
+avgtemp_bs = cl['avgtemp_bs'].values
+avgtemp_delta = cl['avgtemp_delta'].values
+avgprecip_bs = cl['avgprecip_bs'].values
+avgprecip_delta = cl['avgprecip_delta'].values
+TEI_bs = cl['tei_bs'].values
+TEI_delta = cl['tei_delta'].values
+PEI_bs = cl['pei_bs'].values
+PEI_delta = cl['pei_delta'].values
 
 n_spp = prab_baseline.shape[0]
 print(f'  {n_spp} species x {n_cells} cells')

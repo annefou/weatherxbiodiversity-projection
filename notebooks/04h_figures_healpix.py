@@ -38,6 +38,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 # %%
 plt.style.use("seaborn-v0_8-whitegrid")
@@ -136,10 +137,10 @@ def _plot_panel(ax, df, color, title):
 # ## Iberia HEALPix coverage map (cells included in the fit)
 
 # %%
-pa = np.load(OUT_DIR / "presence_absence_healpix.npz", allow_pickle=True)
-iberia_lon = pa["iberia_lon"].astype(float)
-iberia_lat = pa["iberia_lat"].astype(float)
-n_cells_iberia = int(pa["n_cells"][0])
+pa = xr.open_dataset(OUT_DIR / "presence_absence_healpix.nc")
+iberia_lon = pa["lon"].values.astype(float)
+iberia_lat = pa["lat"].values.astype(float)
+n_cells_iberia = int(pa.sizes["cell"])
 
 # Cells that ended up in the fit (extinction subset)
 data_ext = pd.read_parquet(OUT_DIR / "dataGLMM_extinction.parquet")

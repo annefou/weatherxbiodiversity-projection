@@ -40,6 +40,16 @@ NSIDE = 64
 DEPTH = 6                          # 2**6 == 64
 NPIX = 12 * NSIDE * NSIDE          # 49,152 global cells
 
+# WGS84 (not "sphere"): per the EOPF-DGGS legacy-converters reference
+# (legacy_converters/healpix_converters.py + every settings file uses
+# {"ellipsoid": {"name": "wgs84"}}). Sphere↔WGS84 is small per cell
+# (~hundreds of metres) but compounds across decadal climate-impact
+# work (DOMAIN.md § biodiversity is high-precision). DestinE Climate
+# DT itself is WGS84-aware; matching its ellipsoid keeps the substrate
+# alignment exact between Tier-1 fit (CRU TS at HEALPix cell centres)
+# and Tier-2 projection (DestinE HEALPix → analytical HEALPix).
+ELLIPSOID = "WGS84"
+
 # Iberia bbox (matches notebooks/05_destine_download.py:IBERIA_AREA).
 IBERIA_LON_MIN, IBERIA_LON_MAX = -10.0, 4.0
 IBERIA_LAT_MIN, IBERIA_LAT_MAX = 35.0, 44.0
@@ -66,26 +76,20 @@ def _import_healpix_geo_nested():
 
 
 def lonlat_to_pix(lon: np.ndarray, lat: np.ndarray) -> np.ndarray:
-    """Vectorised lon/lat -> HEALPix NESTED pixel index at depth=DEPTH.
-
-    `healpix-geo` works on the WGS84 ellipsoid; we pass `ellipsoid='sphere'`
-    here for parity with the cell-center round-trip used downstream
-    (HEALPix is intrinsically defined on the sphere; the 'WGS84' option
-    in healpix-geo applies a tiny correction we don't need at the
-    biodiversity scale).
-    """
+    """Vectorised lon/lat -> HEALPix NESTED pixel index at depth=DEPTH,
+    on the WGS84 ellipsoid (matches DestinE Climate DT)."""
     nested = _import_healpix_geo_nested()
     lon = np.asarray(lon, dtype='float64')
     lat = np.asarray(lat, dtype='float64')
-    return nested.lonlat_to_healpix(lon, lat, DEPTH).astype(np.uint64)
+    return nested.lonlat_to_healpix(lon, lat, DEPTH, ELLIPSOID).astype(np.uint64)
 
 
 def pix_to_lonlat(ipix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Vectorised pix -> (lon, lat) cell-center, lon wrapped to
-    [-180, 180]. healpix-geo returns lon in [0, 360) by default."""
+    """Vectorised pix -> (lon, lat) cell-center on the WGS84 ellipsoid.
+    Lon wrapped from healpix-geo's native [0, 360) to [-180, 180]."""
     nested = _import_healpix_geo_nested()
     ipix = np.asarray(ipix, dtype='uint64')
-    lon, lat = nested.healpix_to_lonlat(ipix, DEPTH)
+    lon, lat = nested.healpix_to_lonlat(ipix, DEPTH, ELLIPSOID)
     lon = np.where(lon > 180.0, lon - 360.0, lon)
     return lon, lat
 
