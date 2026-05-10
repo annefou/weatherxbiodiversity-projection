@@ -185,7 +185,12 @@ def _plot_rank(ax, records, title, color, order_species=None,
 
 # %%
 def _draw_healpix_map(ax, raster_per_cell, title):
-    """Draw the Iberia raster via `healpix_plot.plot` (EOPF-DGGS canonical).
+    """Draw the Iberia raster via `healpix_plot.plot` (EOPF-DGGS canonical),
+    in **ETRS89 / LAEA Europe (EPSG:3035)** — the canonical European
+    biodiversity reporting CRS (EEA / Natura 2000 / EUNIS / INSPIRE) and
+    an equal-area projection that respects HEALPix's native equal-area
+    pixelisation. PlateCarree would distort cells visually relative to
+    their on-sphere areas — not faithful to the substrate.
 
     Diverging colormap centred on η = 0 (the moderate-risk threshold:
     log-odds 0 ↔ p = 0.5). Red cells = high projected extirpation
@@ -193,8 +198,11 @@ def _draw_healpix_map(ax, raster_per_cell, title):
     p = expit(η) because future predictors lie far outside training
     distribution and expit() saturates uninformatively.
     """
-    proj = ccrs.PlateCarree()
-    ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=proj)
+    # The caller passes an axis already configured with EPSG:3035
+    # (LAEA Europe). We declare the extent in PlateCarree (lon/lat)
+    # — cartopy does the projection internally.
+    pc = ccrs.PlateCarree()
+    ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=pc)
     ax.add_feature(cfeature.LAND, facecolor="#f5f5f5", zorder=0)
     ax.add_feature(cfeature.OCEAN, facecolor="#e8f0fb", zorder=0)
 
@@ -281,7 +289,10 @@ print(f"Saved {out}")
 # %%
 
 def _plot_map(horizon: str, raster: np.ndarray) -> Path:
-    proj = ccrs.PlateCarree()
+    # ETRS89 / LAEA Europe (EPSG:3035) — equal-area, canonical EU
+    # biodiversity reporting CRS. Faithful to HEALPix's equal-area
+    # pixelisation.
+    proj = ccrs.epsg(3035)
     fig = plt.figure(figsize=(7.5, 6))
     ax = plt.axes(projection=proj)
     pc = _draw_healpix_map(
@@ -346,7 +357,7 @@ _plot_rank(
 )
 
 if impactful in per_cell:
-    ax_map = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())
+    ax_map = fig.add_subplot(gs[0, 1], projection=ccrs.epsg(3035))
     pc = _draw_healpix_map(
         ax_map, per_cell[impactful],
         f"Risk map -- {HORIZON_TITLES[impactful]}",
