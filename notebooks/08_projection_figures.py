@@ -88,13 +88,16 @@ for h in HORIZONS:
         print(f"  [missing] {p}")
 
 # %% [markdown]
-# ## Cell vertices via healpix-geo (sphere, NESTED)
+# ## Cell vertices via healpix-geo (WGS84, NESTED)
 #
-# `vertices(ipix, depth)` returns (N, 4) lon/lat arrays — the four
-# corners of each HEALPix cell on the sphere. We wrap longitudes from
-# [0, 360) to [-180, 180] for plotting. Cells that straddle the
-# antimeridian are not an issue at Iberia latitudes — IBERIA is fully
-# in the western hemisphere of the (-180, 180) frame.
+# `vertices(ipix, depth, ellipsoid="WGS84")` returns (N, 4) lon/lat
+# arrays — the four corners of each HEALPix cell on the WGS84
+# ellipsoid (matching DestinE Climate DT, the EOPF-DGGS legacy-converters
+# canonical settings, and the substrate the GLMM was fit on). We wrap
+# longitudes from healpix-geo's native [0, 360) to [-180, 180] for
+# plotting. Cells that straddle the antimeridian are not an issue at
+# Iberia latitudes — IBERIA is fully in the western hemisphere of the
+# (-180, 180) frame.
 
 # %%
 lon_v, lat_v = hp_vertices(IBERIA_PIX_64, DEPTH, ellipsoid="WGS84")
