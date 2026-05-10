@@ -323,6 +323,80 @@ for h in HORIZONS:
 
 
 # %% [markdown]
+# ## Projection comparison — WGS84 / PlateCarree vs ETRS89 / LAEA Europe
+#
+# Same η raster, same colormap, same colorbar — different cartographic
+# projections. Demonstrates the visual consequence of the projection
+# choice. Both projections are geographically faithful in their own
+# sense:
+#
+#   * **PlateCarree (WGS84 lon/lat)** — preserves NOTHING (not area,
+#     not angle, not distance). Cells are mapped 1:1 from lon/lat to
+#     plot x/y. At Iberia latitudes (35-44° N) this stretches cells
+#     east-west by a factor of cos(40°) ≈ 1.31 relative to their true
+#     on-sphere shape. **Easy to read; not equal-area; not the
+#     canonical EU choice.**
+#
+#   * **ETRS89 / LAEA Europe (EPSG:3035)** — equal-area, low-distortion
+#     for Europe (centred on lat 52° N, lon 10° E). Faithful to
+#     HEALPix's native equal-area pixelisation. **Canonical EEA /
+#     Natura 2000 / EUNIS / INSPIRE biodiversity reporting CRS.**
+#
+# Use this comparison figure when a reader asks "does projection choice
+# affect the apparent spatial pattern?" — answer: not the high-vs-low
+# regions, but absolutely the visual proportions.
+
+# %%
+def _plot_proj_comparison(horizon: str, raster: np.ndarray) -> Path:
+    """Side-by-side same-data, two-projection comparison map."""
+    fig = plt.figure(figsize=(14, 6))
+    proj_left = ccrs.PlateCarree()
+    proj_right = ccrs.epsg(3035)
+    ax_left = fig.add_subplot(1, 2, 1, projection=proj_left)
+    ax_right = fig.add_subplot(1, 2, 2, projection=proj_right)
+
+    pc_left = _draw_healpix_map(
+        ax_left, raster,
+        f"WGS84 / PlateCarree (EPSG:4326) — {HORIZON_TITLES[horizon]}",
+    )
+    pc_right = _draw_healpix_map(
+        ax_right, raster,
+        f"ETRS89 / LAEA Europe (EPSG:3035) — {HORIZON_TITLES[horizon]}",
+    )
+
+    # Shared colorbar (using the LAEA mappable; both panels share the
+    # same vmin/vmax because _draw_healpix_map computes span from the
+    # raster, which is the same in both calls).
+    if pc_right is not None:
+        cbar = fig.colorbar(
+            pc_right, ax=[ax_left, ax_right], orientation="horizontal",
+            fraction=0.05, pad=0.06, aspect=40,
+        )
+        cbar.set_label("Community-mean η (log-odds of extirpation)")
+
+    fig.suptitle(
+        f"Iberian Bombus extirpation projection — projection comparison "
+        f"({HORIZON_TITLES[horizon]})",
+        fontsize=13,
+    )
+    fig.text(
+        0.5, 0.01, DATA_FOOTER,
+        ha="center", va="bottom", fontsize=8, color="dimgray", style="italic",
+    )
+    out = FIG_DIR / f"projection_proj_comparison_{horizon}.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.show()
+    return out
+
+
+for h in HORIZONS:
+    if h not in per_cell:
+        continue
+    out = _plot_proj_comparison(h, per_cell[h])
+    print(f"Saved {out}")
+
+
+# %% [markdown]
 # ## Figure 4 — combined summary panel for the Jupyter Book
 
 # %%

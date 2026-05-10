@@ -302,6 +302,8 @@ rule projection_figures:
         f"{FIGURES}/projection_species_rank.png",
         f"{FIGURES}/projection_risk_map_2020_2029.png",
         f"{FIGURES}/projection_risk_map_2030_2039.png",
+        f"{FIGURES}/projection_proj_comparison_2020_2029.png",
+        f"{FIGURES}/projection_proj_comparison_2030_2039.png",
         f"{FIGURES}/projection_summary.png",
     log:
         f"{RESULTS}/logs/08_projection_figures.log",
