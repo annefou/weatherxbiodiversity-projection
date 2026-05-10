@@ -614,3 +614,30 @@ out = FIG_DIR / "projection_summary.png"
 fig.savefig(out, dpi=150, bbox_inches="tight")
 plt.show()
 print(f"Saved {out}")
+
+# %% [markdown]
+# ## Tier-2 figures (committed; CI-renderable)
+#
+# Tier-2 notebooks 05–08 require DestinE Climate DT credentials, so this
+# chapter cannot execute on a generic GitHub Actions runner. The figures
+# below are the committed PNGs from the local DestinE-platform run.
+#
+# ### Headline projection summary
+#
+# ![Iberian Bombus extirpation projection — DestinE Climate DT SSP3-7.0 (community-mean η + species rank, mid-term horizon)](../figures/projection_summary.png)
+#
+# ### Per-species rank under SSP3-7.0
+#
+# ![Per-species community-mean η at near-term and mid-term horizons](../figures/projection_species_rank.png)
+#
+# ### Per-cell extirpation risk maps
+#
+# ![Per-cell community-mean η at near-term horizon (2020-2029) on EPSG:3035 ETRS89/LAEA Europe — HEALPix nside=64 native polygons](../figures/projection_risk_map_2020_2029.png)
+#
+# ![Per-cell community-mean η at mid-term horizon (2030-2039) — HEALPix nside=64 native polygons](../figures/projection_risk_map_2030_2039.png)
+#
+# ### Mollweide vs LAEA Europe comparison
+#
+# ![Same per-cell risk on Mollweide (HEALPix canonical) and EPSG:3035 LAEA Europe — near-term horizon](../figures/projection_proj_comparison_2020_2029.png)
+#
+# ![Same per-cell risk on Mollweide and EPSG:3035 LAEA Europe — mid-term horizon](../figures/projection_proj_comparison_2030_2039.png)

@@ -243,3 +243,8 @@ out_path = FIG_DIR / "main_result_healpix.png"
 fig.savefig(out_path, dpi=150, bbox_inches="tight")
 plt.show()
 print(f"\nSaved {out_path}")
+
+# %% [markdown]
+# ## Headline Tier-1 figure (committed)
+#
+# ![Tier-1 GLMM coefficient comparison: CEA vs HEALPix nside=64 — sc_TEI_delta is positive, large, and credible at both substrates (within 30%), confirming Soroye's central biological claim replicates on Iberian Bombus](../figures/main_result_healpix.png)

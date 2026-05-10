@@ -13,9 +13,6 @@
 #     name: python3
 # ---
 
-# %%
-import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
-
 # %% [markdown]
 # # 05 — DestinE Climate DT GRIB retrieve (DestinE platform only)
 #
@@ -58,6 +55,12 @@ import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
 #     0000 UTC) — 24-hour daily totals.
 #
 # Total = 4 polytope retrievals (2 horizons × 2 variables).
+
+# %%
+# Tier-2 CI guard — exits cleanly if DestinE Climate DT credentials are
+# not present (e.g. a GitHub Actions runner). On the DestinE Jupyter
+# platform this is a no-op.
+import _tier2_guard; _tier2_guard.ensure_destine_or_skip()
 
 # %%
 import tempfile
