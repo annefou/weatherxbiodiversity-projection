@@ -47,8 +47,8 @@ import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from healpix_geo.nested import vertices as hp_vertices
-from matplotlib.collections import PolyCollection
+import healpix_plot
+from healpix_plot import HealpixGrid
 
 # %%
 plt.style.use("seaborn-v0_8-whitegrid")
@@ -91,29 +91,27 @@ for h in HORIZONS:
         print(f"  [missing] {p}")
 
 # %% [markdown]
-# ## Cell vertices via healpix-geo (WGS84, NESTED)
+# ## HEALPix plotting via `healpix_plot` (EOPF-DGGS canonical)
 #
-# `vertices(ipix, depth, ellipsoid="WGS84")` returns (N, 4) lon/lat
-# arrays — the four corners of each HEALPix cell on the WGS84
-# ellipsoid (matching DestinE Climate DT, the EOPF-DGGS legacy-converters
-# canonical settings, and the substrate the GLMM was fit on). We wrap
-# longitudes from healpix-geo's native [0, 360) to [-180, 180] for
-# plotting. Cells that straddle the antimeridian are not an issue at
-# Iberia latitudes — IBERIA is fully in the western hemisphere of the
-# (-180, 180) frame.
+# We use `healpix_plot.plot()` — the EOPF-DGGS-canonical HEALPix +
+# cartopy plotting bridge (per `DOMAIN.md`: *"replaces ad-hoc ang2pix
+# + pcolormesh bridges"*). Internally it:
+#
+# 1. Resamples the 120 sparse nside=64 NESTED cells onto a dense
+#    regular lon/lat grid (nearest-neighbour by default) at the
+#    requested `view` extent.
+# 2. Renders the resampled raster cleanly in any cartopy projection.
+#
+# This replaces our previous manual `PolyCollection` of cell-vertex
+# polygons, which had two visual artefacts: (a) diamond-oriented
+# polygons that — although technically correct HEALPix geometry for
+# the equatorial belt — looked geometrically unfamiliar; (b)
+# straight-edge approximation in PlateCarree caused micro-overlap
+# at sub-pixel boundaries.
 
 # %%
-lon_v, lat_v = hp_vertices(IBERIA_PIX_64, DEPTH, ellipsoid="WGS84")
-# (N_64, 4) for both
-lon_v = np.where(lon_v > 180.0, lon_v - 360.0, lon_v)
-print(f"vertex array shapes: lon={lon_v.shape}  lat={lat_v.shape}")
-print(
-    f"lon vertex range: {lon_v.min():.2f} .. {lon_v.max():.2f}  "
-    f"lat vertex range: {lat_v.min():.2f} .. {lat_v.max():.2f}"
-)
-
-# Build (N_64, 4, 2) polygon array for matplotlib.
-poly_xy = np.stack([lon_v, lat_v], axis=-1)         # (N_64, 4, 2)
+HPX_GRID = HealpixGrid(level=DEPTH, indexing_scheme="nested", ellipsoid="WGS84")
+print(f"HealpixGrid: level={DEPTH} (nside={2**DEPTH}), NESTED, WGS84")
 
 # %% [markdown]
 # ## Helper: ranked bar chart on a given matplotlib axis
@@ -187,7 +185,7 @@ def _plot_rank(ax, records, title, color, order_species=None,
 
 # %%
 def _draw_healpix_map(ax, raster_per_cell, title):
-    """Draw the Iberia raster as colour-filled HEALPix-cell polygons.
+    """Draw the Iberia raster via `healpix_plot.plot` (EOPF-DGGS canonical).
 
     Diverging colormap centred on η = 0 (the moderate-risk threshold:
     log-odds 0 ↔ p = 0.5). Red cells = high projected extirpation
@@ -199,8 +197,6 @@ def _draw_healpix_map(ax, raster_per_cell, title):
     ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=proj)
     ax.add_feature(cfeature.LAND, facecolor="#f5f5f5", zorder=0)
     ax.add_feature(cfeature.OCEAN, facecolor="#e8f0fb", zorder=0)
-    ax.add_feature(cfeature.COASTLINE, linewidth=0.6, zorder=2)
-    ax.add_feature(cfeature.BORDERS, linewidth=0.4, linestyle=":", zorder=2)
 
     valid = np.isfinite(raster_per_cell)
     if valid.sum() == 0:
@@ -208,24 +204,31 @@ def _draw_healpix_map(ax, raster_per_cell, title):
         return None
 
     span = max(0.5, float(np.nanpercentile(np.abs(raster_per_cell), 98)))
-    cmap = plt.get_cmap("RdBu_r")
-    norm = plt.Normalize(vmin=-span, vmax=+span)
 
-    polys = poly_xy[valid]
-    vals = raster_per_cell[valid]
-    pc = PolyCollection(
-        polys,
-        array=vals,
-        cmap=cmap,
-        norm=norm,
-        edgecolors="black",
-        linewidths=0.2,
-        transform=proj,
-        zorder=1,
+    # `healpix_plot.plot` resamples the 120 sparse NESTED cells onto a
+    # regular grid at the requested `view` extent and plots in cartopy.
+    # Returns an AxesImage we can attach a colorbar to. shape=600 is
+    # ample for a 14°×9° view at nside=64 (~92 km cells).
+    img = healpix_plot.plot(
+        cell_ids=IBERIA_PIX_64.astype(np.uint64),
+        data=raster_per_cell.astype(np.float64),
+        healpix_grid=HPX_GRID,
+        sampling_grid={"shape": 600},
+        view=(-10.5, 4.5, 35.0, 44.5),
+        interpolation="nearest",
+        background_value=np.nan,
+        ax=ax,
+        cmap="RdBu_r",
+        vmin=-span,
+        vmax=+span,
+        title=None,    # we set the title below to keep style consistent
     )
-    ax.add_collection(pc)
+    # Re-overlay coastlines + borders ON TOP of the resampled raster
+    # (healpix_plot draws into ax, which clobbers our zordered features).
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.6, zorder=3)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.4, linestyle=":", zorder=3)
     ax.set_title(title, fontsize=11)
-    return pc
+    return img
 
 
 # %% [markdown]

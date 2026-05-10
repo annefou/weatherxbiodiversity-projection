@@ -66,3 +66,10 @@ dependencies:
     # to keep the env reproducible on both DestinE and a local Mac.
     - earthkit-data
     - polytope-client
+    # healpix-plot is the EOPF-DGGS canonical HEALPix+cartopy plotting
+    # library (per DOMAIN.md: "replaces ad-hoc ang2pix + pcolormesh
+    # bridges"). Resamples HEALPix to a regular grid via
+    # nearest/bilinear and renders cleanly in any cartopy projection;
+    # avoids the polygon-overlap artefacts of manual PolyCollection.
+    # PyPI-only as of 2026-05; small dep (~1 MB).
+    - healpix-plot
