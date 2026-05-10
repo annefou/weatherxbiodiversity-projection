@@ -167,3 +167,33 @@ out_path = FIG_DIR / "main_result.png"
 fig.savefig(out_path, dpi=150, bbox_inches="tight")
 plt.show()
 print(f"\nSaved {out_path}")
+
+# %% [markdown]
+# ## What this chapter produces
+#
+# This chapter generates `figures/main_result.png` — a forest plot of the
+# CEA-only Tier-1 GLMM coefficients for Iberian *Bombus*, intended as a
+# Pass-1 sanity check that the Soroye et al. (2020) GLMM replicates on
+# Iberian data with Soroye's own CRU TS climate inputs.
+#
+# **The CEA-only PNG is intentionally not committed to the repo**
+# (see `.gitignore`). The canonical Tier-1 deliverable is the
+# **substrate-comparison figure** in chapter `04h_figures_healpix`, which
+# shows the same coefficients side-by-side at CEA and HEALPix nside=64
+# and reports the substrate-robustness verdict. Reproducing the CEA-only
+# figure here:
+#
+# ```bash
+# snakemake --cores 1 figures/main_result.png
+# ```
+#
+# Or by running this notebook directly:
+#
+# ```bash
+# jupyter execute --inplace notebooks/04_figures.ipynb
+# ```
+#
+# The headline Tier-1 visual (CEA + HEALPix side-by-side) is on the next
+# chapter:
+#
+# ![Tier-1 GLMM coefficient comparison: CEA vs HEALPix nside=64 — sc_TEI_delta is positive, large, and credible at both substrates (within 30%)](../figures/main_result_healpix.png)
