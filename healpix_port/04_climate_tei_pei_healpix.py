@@ -427,6 +427,196 @@ encoding = {
 }
 ds.to_netcdf(out_path, engine='netcdf4', encoding=encoding)
 print(f'\nSaved -> {out_path}')
+
+
+# =====================================================================
+# OPTION B (proper) — nside=128 historical baseline
+# =====================================================================
+# Sample CRU TS at nside=128 cell centres (440 Iberian cells), compute
+# the same Climatic Position Index machinery, derive standardisation
+# constants from the nside=128 distribution. The species' thermal +
+# precipitation niche limits (T_min_spp, T_max_spp, P_min_spp, P_max_spp)
+# are SPECIES-LEVEL — kept identical to the nside=64 fit so the GLMM's
+# coefficient β scaling is preserved at species granularity. What
+# CHANGES at nside=128 is the per-cell baseline climate (sampled from
+# CRU at nside=128 cell centres, NOT parent-inherited from nside=64).
+#
+# This file is consumed by notebooks/06_destine_clean.py to compute
+# proper TEI_delta = TEI_future_128 - TEI_bs_128 (both at nside=128),
+# and by notebooks/07_projection.py to z-score future predictors with
+# the nside=128 standardisation reference.
+
+print('\n--- Option B extension: nside=128 baseline climate ---')
+
+PRECOMP = ROOT / 'data' / 'precomputed'
+iberia_pix_128 = np.load(PRECOMP / 'iberia_pix_nside128_nested.npy').astype(np.uint64)
+n_cells_128 = len(iberia_pix_128)
+
+import healpix_geo  # noqa: E402
+lon_128_arr, lat_128_arr = healpix_geo.nested.healpix_to_lonlat(
+    iberia_pix_128, 7, 'WGS84',
+)
+lon_128_arr = np.where(lon_128_arr > 180.0, lon_128_arr - 360.0, lon_128_arr)
+print(f'  {n_cells_128} nside=128 cell centres computed (WGS84)')
+
+
+def interp_years_128(da: xr.DataArray, years: list[int]) -> np.ndarray:
+    out = np.full((len(years), n_cells_128), np.nan, dtype=np.float32)
+    avail = set(int(y) for y in da.year.values)
+    for i, yr in enumerate(years):
+        if yr not in avail:
+            continue
+        layer = da.sel(year=yr)
+        if 'latitude' in layer.dims:
+            layer = layer.rename({'latitude': 'lat', 'longitude': 'lon'})
+        out[i, :] = bilinear_at_points(layer, lat_128_arr, lon_128_arr)
+    return out
+
+
+print('  Interpolating CRU TS to nside=128 cell centres ...')
+tmp_bs_128 = interp_years_128(tmp_annual, BASELINE_YEARS)
+tmp_rc_128 = interp_years_128(tmp_annual, RECENT_YEARS)
+pre_bs_128 = interp_years_128(pre_annual, BASELINE_YEARS)
+pre_rc_128 = interp_years_128(pre_annual, RECENT_YEARS)
+
+meanT_bs_128 = np.nanmean(tmp_bs_128, axis=0)
+meanT_rc_128 = np.nanmean(tmp_rc_128, axis=0)
+meanP_bs_128 = np.nanmean(pre_bs_128, axis=0)
+meanP_rc_128 = np.nanmean(pre_rc_128, axis=0)
+
+# Per-species TEI/PEI at nside=128 (species niche limits unchanged from nside=64).
+TEI_bs_128 = (meanT_bs_128[np.newaxis, :] - T_min_spp[:, np.newaxis]) / T_range[:, np.newaxis]
+TEI_rc_128 = (meanT_rc_128[np.newaxis, :] - T_min_spp[:, np.newaxis]) / T_range[:, np.newaxis]
+TEI_delta_128 = TEI_rc_128 - TEI_bs_128
+
+PEI_bs_128 = (meanP_bs_128[np.newaxis, :] - P_min_spp[:, np.newaxis]) / P_range[:, np.newaxis]
+PEI_rc_128 = (meanP_rc_128[np.newaxis, :] - P_min_spp[:, np.newaxis]) / P_range[:, np.newaxis]
+PEI_delta_128 = PEI_rc_128 - PEI_bs_128
+
+# Build per-species observation mask at nside=128 via parent-inheritance
+# (each child gets its parent's historical observation status — there
+# is no nside=128 GBIF cleaning, so this is the best available signal
+# for "which species was historically present in this cell").
+parent_to_row64 = {int(p): i for i, p in enumerate(iberia_cells_hp.astype(np.int64))}
+parents_of_children = (iberia_pix_128.astype(np.int64) >> 2)
+parent_row_128 = np.array(
+    [parent_to_row64[int(p)] for p in parents_of_children], dtype=np.int64,
+)
+prab_baseline_128 = prab_baseline[:, parent_row_128]    # (n_spp, 440)
+
+
+def std_over_observed(arr_128: np.ndarray, prab_128: np.ndarray) -> tuple[float, float]:
+    """μ + ddof=1 σ over (species × cell) entries where the species was
+    historically observed in the parent. Matches the Tier-1 standardisation
+    reference shape (species × cell rows, observed-only)."""
+    mask = (prab_128 > 0) & np.isfinite(arr_128)
+    vals = arr_128[mask]
+    if vals.size < 2:
+        return float('nan'), float('nan')
+    return float(vals.mean()), float(vals.std(ddof=1))
+
+
+mu_TEI_bs_128, sd_TEI_bs_128 = std_over_observed(TEI_bs_128, prab_baseline_128)
+mu_TEI_delta_128, sd_TEI_delta_128 = std_over_observed(TEI_delta_128, prab_baseline_128)
+mu_PEI_bs_128, sd_PEI_bs_128 = std_over_observed(PEI_bs_128, prab_baseline_128)
+mu_PEI_delta_128, sd_PEI_delta_128 = std_over_observed(PEI_delta_128, prab_baseline_128)
+
+print('  Standardisation constants (nside=128 vs nside=64 in attrs):')
+print(f'    TEI_bs:    mu={mu_TEI_bs_128:.4f}    sd={sd_TEI_bs_128:.4f}')
+print(f'    TEI_delta: mu={mu_TEI_delta_128:.4f} sd={sd_TEI_delta_128:.4f}')
+print(f'    PEI_bs:    mu={mu_PEI_bs_128:.4f}    sd={sd_PEI_bs_128:.4f}')
+print(f'    PEI_delta: mu={mu_PEI_delta_128:.4f} sd={sd_PEI_delta_128:.4f}')
+
+ds128 = xr.Dataset(
+    data_vars={
+        'tei_bs': (('species', 'cells'), TEI_bs_128.astype(np.float32),
+                   {'long_name': 'CPI thermal baseline at nside=128 (CRU-sampled at cell centres)',
+                    '_FillValue': np.float32(np.nan)}),
+        'tei_rc': (('species', 'cells'), TEI_rc_128.astype(np.float32),
+                   {'long_name': 'CPI thermal recent at nside=128',
+                    '_FillValue': np.float32(np.nan)}),
+        'tei_delta': (('species', 'cells'), TEI_delta_128.astype(np.float32),
+                      {'long_name': 'CPI thermal delta = recent − baseline at nside=128',
+                       '_FillValue': np.float32(np.nan)}),
+        'pei_bs': (('species', 'cells'), PEI_bs_128.astype(np.float32),
+                   {'long_name': 'CPI precipitation baseline at nside=128',
+                    '_FillValue': np.float32(np.nan)}),
+        'pei_rc': (('species', 'cells'), PEI_rc_128.astype(np.float32),
+                   {'long_name': 'CPI precipitation recent at nside=128',
+                    '_FillValue': np.float32(np.nan)}),
+        'pei_delta': (('species', 'cells'), PEI_delta_128.astype(np.float32),
+                      {'long_name': 'CPI precipitation delta at nside=128',
+                       '_FillValue': np.float32(np.nan)}),
+        'meanT_bs': (('cells',), meanT_bs_128.astype(np.float32),
+                     {'long_name': 'baseline mean annual temperature at nside=128 cell centre',
+                      'units': 'degC'}),
+        'meanT_rc': (('cells',), meanT_rc_128.astype(np.float32),
+                     {'long_name': 'recent mean annual temperature at nside=128 cell centre',
+                      'units': 'degC'}),
+        'meanP_bs': (('cells',), meanP_bs_128.astype(np.float32),
+                     {'long_name': 'baseline annual total precipitation at nside=128 cell centre',
+                      'units': 'mm year-1'}),
+        'meanP_rc': (('cells',), meanP_rc_128.astype(np.float32),
+                     {'long_name': 'recent annual total precipitation at nside=128 cell centre',
+                      'units': 'mm year-1'}),
+        'lon': (('cells',), lon_128_arr.astype(np.float32),
+                {'standard_name': 'longitude', 'units': 'degrees_east'}),
+        'lat': (('cells',), lat_128_arr.astype(np.float32),
+                {'standard_name': 'latitude', 'units': 'degrees_north'}),
+        'parent_row_in_nside64': (('cells',), parent_row_128.astype(np.int32),
+                                  {'long_name': 'row index in nside=64 IBERIA_PIX_64 of this child\'s parent'}),
+        'T_min_spp': (('species',), T_min_spp.astype(np.float32),
+                      {'long_name': 'species cold thermal limit (Tier-1 nside=64-derived; species-level, unchanged)'}),
+        'T_max_spp': (('species',), T_max_spp.astype(np.float32),
+                      {'long_name': 'species hot thermal limit (species-level, unchanged)'}),
+        'P_min_spp': (('species',), P_min_spp.astype(np.float32),
+                      {'long_name': 'species dry precipitation limit (species-level, unchanged)'}),
+        'P_max_spp': (('species',), P_max_spp.astype(np.float32),
+                      {'long_name': 'species wet precipitation limit (species-level, unchanged)'}),
+    },
+    coords={
+        'species': np.array(species, dtype=object),
+        'cell_ids': ('cells', iberia_pix_128.astype(np.int64)),
+    },
+    attrs={
+        'Conventions': 'CF-1.10',
+        'title': 'Tier-1 historical CPI at HEALPix nside=128 NESTED — Option B baseline',
+        'source': 'CRU TS 3.24.01 sampled at nside=128 cell centres (WGS84)',
+        'history': f'Created {date.today().isoformat()} by healpix_port/04_climate_tei_pei_healpix.py',
+        **{**PROJECT_DGGS_ATTRS, 'dggs_grid_refinement_level': 7},
+        'n_cells': int(n_cells_128),
+        'baseline_period': '1901-1974',
+        'recent_period': '2000-2014',
+        # Standardisation constants for Option B z-scoring at nside=128.
+        # Used by notebooks/07_projection.py when applying Tier-1 GLMM
+        # coefficients to nside=128 predictors.
+        'std_TEI_bs_mu':    mu_TEI_bs_128,
+        'std_TEI_bs_sd':    sd_TEI_bs_128,
+        'std_TEI_delta_mu': mu_TEI_delta_128,
+        'std_TEI_delta_sd': sd_TEI_delta_128,
+        'std_PEI_bs_mu':    mu_PEI_bs_128,
+        'std_PEI_bs_sd':    sd_PEI_bs_128,
+        'std_PEI_delta_mu': mu_PEI_delta_128,
+        'std_PEI_delta_sd': sd_PEI_delta_128,
+        'std_reference': (
+            'Computed at nside=128 over (species × cell) entries where the '
+            'species was historically observed at the parent nside=64 cell. '
+            'Different from Tier-1 nside=64 reference; applying Tier-1 GLMM '
+            'coefficients to these z-scores assumes the GLMM\'s coefficient '
+            'magnitude is comparable across z-score scales when applied at '
+            'matched substrate scale.'
+        ),
+    },
+)
+ds128['cell_ids'].attrs.update({
+    'long_name': 'HEALPix NESTED pixel index (nside=128)',
+})
+ds128['species'].attrs.update({'long_name': 'Bombus species binomial epithet'})
+
+out_path_128 = OUT_DIR / 'climate_tei_pei_healpix_nside128.nc'
+enc128 = {name: {'zlib': True, 'complevel': 4} for name in ds128.data_vars}
+ds128.to_netcdf(out_path_128, engine='netcdf4', encoding=enc128)
+print(f'  Saved -> {out_path_128}')
 print(f'\navgtemp_bs range: {np.nanmin(avgtemp_bs):.2f}..{np.nanmax(avgtemp_bs):.2f} degC')
 print(f'avgtemp_delta range: {np.nanmin(avgtemp_delta):.2f}..{np.nanmax(avgtemp_delta):.2f} degC')
 print(f'TEI_delta range: {np.nanmin(TEI_delta):.3f}..{np.nanmax(TEI_delta):.3f}')

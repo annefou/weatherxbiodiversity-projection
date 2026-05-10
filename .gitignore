@@ -62,6 +62,14 @@ healpix_port/outputs_iberia/*
 # Snakemake metadata
 .snakemake/
 
+# Tier-1 CEA forest plot — produced by notebooks/04_figures.py for
+# anyone re-running locally, but no longer tracked. The CEA reproduction
+# evidence (sc_TEI_delta = +0.479 matching upstream) lives in
+# results/headline_statistic.json; main_result_healpix.png embeds the
+# same upstream-CEA reference values alongside the HEALPix fit, so this
+# figure is structurally redundant for the FORRT chain.
+figures/main_result.png
+
 # Tier 2 — DestinE Climate DT (licence-locked redistribution)
 # Raw NetCDF extracts and per-cell rasters approach a climate fingerprint;
 # only the aggregated species-level summary JSON + the figures are committed.

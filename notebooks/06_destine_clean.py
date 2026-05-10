@@ -649,11 +649,21 @@ for horizon in HORIZONS:
     annual_p_128_mm = annual_p_128 * 1000.0 * TP_HOURLY_TO_DAILY_FACTOR
     meanP_future_128 = annual_p_128_mm.mean(axis=0)          # (N_128,) mm/yr
 
-    # Inherit per-parent baselines for each of the 4 children.
-    TEI_bs_hist_128 = TEI_bs_hist[:, parent_row_for_child]   # (n_spp, N_128)
-    PEI_bs_hist_128 = PEI_bs_hist[:, parent_row_for_child]
-    avgtemp_bs_hist_128 = avgtemp_bs_hist[parent_row_for_child]    # (N_128,)
-    avgprecip_bs_hist_128 = avgprecip_bs_hist[parent_row_for_child]
+    # Load Tier-1 nside=128 historical baseline (CRU TS sampled at
+    # nside=128 cell centres) — the proper Option B reference.
+    # Replaces the earlier parent-inheritance approach which inflated
+    # η for cold-adapted species by mismatching the baseline scale.
+    hist128_path = OUT_DIR / "climate_tei_pei_healpix_nside128.nc"
+    if not hist128_path.exists():
+        raise SystemExit(
+            f"Missing {hist128_path}. Run healpix_port/04_climate_tei_pei_healpix.py "
+            "to produce the Option-B nside=128 historical baseline."
+        )
+    hist128 = xr.open_dataset(hist128_path)
+    TEI_bs_hist_128 = hist128["tei_bs"].values            # (n_spp, N_128) — proper baseline
+    PEI_bs_hist_128 = hist128["pei_bs"].values
+    avgtemp_bs_hist_128 = hist128["meanT_bs"].values      # (N_128,) — proper baseline
+    avgprecip_bs_hist_128 = hist128["meanP_bs"].values
 
     with np.errstate(invalid="ignore", divide="ignore"):
         TEI_future_128 = (

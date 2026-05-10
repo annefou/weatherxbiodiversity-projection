@@ -145,6 +145,8 @@ rule data_clean_healpix:
         f"{HPORT}/outputs_iberia/presence_absence_healpix.nc",
         f"{HPORT}/outputs_iberia/sampling_continent_healpix.nc",
         f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.nc",
+        # Option B (proper) — nside=128 historical baseline + standardisation
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix_nside128.nc",
     log:
         f"{RESULTS}/logs/02h_data_clean_healpix.log",
     shell:
@@ -251,6 +253,7 @@ rule destine_clean:
         f"{DATA_DESTINE}/raw/destine_2030_2039_t2m.grib",
         f"{DATA_DESTINE}/raw/destine_2030_2039_tp.grib",
         f"{HPORT}/outputs_iberia/climate_tei_pei_healpix.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_healpix_nside128.nc",
     output:
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.nc",
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.nc",

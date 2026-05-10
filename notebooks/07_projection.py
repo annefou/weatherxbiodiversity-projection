@@ -513,21 +513,62 @@ for horizon in HORIZONS:
         )
 
 # %% [markdown]
-# ## Option B — nside=128 projection (DestinE-resolution maps)
+# ## Option B (proper) — nside=128 projection (DestinE-resolution maps)
 #
-# Same GLMM (calibrated at nside=64), evaluated on the nside=128 climate
-# predictors produced by `06_destine_clean.py`. Per-species historical
-# baselines and sampling effort are parent-inherited (each nside=128
-# child gets its nside=64 parent's value); per-cell future TEI/PEI
-# varies per nside=128 cell because DestinE climate is at nside=128.
-# The species-rank stays approximately the same as the nside=64 path;
-# the gain is in the spatial resolution of the per-cell raster.
+# Same GLMM coefficients (calibrated at nside=64), evaluated on the
+# nside=128 climate predictors. The Tier-1 nside=128 historical
+# baseline (CRU TS sampled at nside=128 cell centres) and its
+# **standardisation constants** are loaded from
+# `healpix_port/outputs_iberia/climate_tei_pei_healpix_nside128.nc`
+# — produced by `healpix_port/04_climate_tei_pei_healpix.py`'s
+# Option-B extension. This replaces the earlier parent-inheritance
+# z-scoring which inflated η for cold-adapted species at extreme
+# child cells (the within-parent climate variance was much larger
+# than σ_Tier1_64 expected).
 #
-# Headline ranking remains nside=64 in `horizons` (substrate-robustness
-# anchor); nside=128 ranking is added under `horizons_nside128` for
-# direct comparison.
+# Methodological note: the GLMM coefficients β were trained against
+# nside=64 z-scores. Applying β to nside=128 z-scores assumes β is
+# scale-invariant when the substrate scales match (~92 km vs ~46 km).
+# This is the Option-B trade-off: cleaner standardisation at nside=128
+# vs perfect coefficient interpretability with nside=64 z-scoring.
+# Headline ranking remains nside=64 (`horizons`); nside=128 ranking is
+# added under `horizons_nside128` for transparency.
 
 # %%
+# Load nside=128 standardisation constants (computed in
+# healpix_port/04_climate_tei_pei_healpix.py over (species × cell)
+# entries where the species was historically observed).
+_hist128_path = OUT_DIR / "climate_tei_pei_healpix_nside128.nc"
+if _hist128_path.exists():
+    _hist128 = xr.open_dataset(_hist128_path)
+    scaling_128 = {
+        "TEI_bs":    {"mean": float(_hist128.attrs["std_TEI_bs_mu"]),
+                      "sd":   float(_hist128.attrs["std_TEI_bs_sd"])},
+        "TEI_delta": {"mean": float(_hist128.attrs["std_TEI_delta_mu"]),
+                      "sd":   float(_hist128.attrs["std_TEI_delta_sd"])},
+        "PEI_bs":    {"mean": float(_hist128.attrs["std_PEI_bs_mu"]),
+                      "sd":   float(_hist128.attrs["std_PEI_bs_sd"])},
+        "PEI_delta": {"mean": float(_hist128.attrs["std_PEI_delta_mu"]),
+                      "sd":   float(_hist128.attrs["std_PEI_delta_sd"])},
+        # sampling stays at Tier-1 nside=64 reference (sampling effort is
+        # cell-level and inherited; no new distribution at nside=128)
+        "sampling":  scaling["sampling"],
+    }
+    print("nside=128 standardisation constants (vs nside=64 in parens):")
+    for col in ("TEI_bs", "TEI_delta", "PEI_bs", "PEI_delta"):
+        m128 = scaling_128[col]
+        m64 = scaling[col]
+        print(f"  {col:<10}  μ={m128['mean']:+.4f} (vs {m64['mean']:+.4f})  "
+              f"σ={m128['sd']:.4f} (vs {m64['sd']:.4f})")
+else:
+    print("[warn] nside=128 baseline missing; will fall back to nside=64 z-scoring")
+    scaling_128 = scaling
+
+
+def _z128(arr: np.ndarray, col: str) -> np.ndarray:
+    return (arr - scaling_128[col]["mean"]) / scaling_128[col]["sd"]
+
+
 projection_summary["horizons_nside128"] = {}
 
 for horizon in HORIZONS:
@@ -585,11 +626,11 @@ for horizon in HORIZONS:
             continue
 
         cell_full_idx = np.flatnonzero(cell_mask_128)[valid]
-        sc_TEI_bs_v = _z(tei_bs_v[valid], "TEI_bs")
-        sc_TEI_delta_v = _z(tei_dl_v[valid], "TEI_delta")
-        sc_PEI_bs_v = _z(pei_bs_v[valid], "PEI_bs")
-        sc_PEI_delta_v = _z(pei_dl_v[valid], "PEI_delta")
-        sc_sampling_v = _z(sampling_v[valid], "sampling")
+        sc_TEI_bs_v = _z128(tei_bs_v[valid], "TEI_bs")
+        sc_TEI_delta_v = _z128(tei_dl_v[valid], "TEI_delta")
+        sc_PEI_bs_v = _z128(pei_bs_v[valid], "PEI_bs")
+        sc_PEI_delta_v = _z128(pei_dl_v[valid], "PEI_delta")
+        sc_sampling_v = _z128(sampling_v[valid], "sampling")
 
         X = build_design_row(
             sc_sampling_v, sc_TEI_bs_v, sc_TEI_delta_v,
