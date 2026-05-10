@@ -26,8 +26,17 @@ jobs:
       - name: Skip if template has not been initialised
         id: guard
         run: |
-          if grep -rln '{{[A-Z_]\+}}' . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.cff' --include='*.py' 2>/dev/null | grep -v '^./.claude/skills/init-template/' | head -1 > /dev/null; then
-            echo "::notice::Template placeholders detected ({{...}} tokens). Run /init-template inside Claude Code (or substitute manually) before the Jupyter Book builds meaningfully. Skipping."
+          # Look for any unresolved {{...}} placeholder OTHER than
+          # {{ZENODO_DOI}}, which is intentionally filled in only after the
+          # first GitHub release mints a Zenodo concept DOI.
+          UNRESOLVED=$(grep -rhoE '\{\{[A-Z_]+\}\}' . \
+            --include='*.md' --include='*.yml' --include='*.yaml' \
+            --include='*.json' --include='*.cff' --include='*.py' 2>/dev/null \
+            | grep -v '^{{ZENODO_DOI}}$' \
+            | sort -u \
+            | head -1)
+          if [ -n "$UNRESOLVED" ]; then
+            echo "::notice::Template placeholder ${UNRESOLVED} still present. Run /init-template inside Claude Code (or substitute manually) before the Jupyter Book builds meaningfully. Skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
