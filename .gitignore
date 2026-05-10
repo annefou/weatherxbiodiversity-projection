@@ -91,3 +91,6 @@ healpix_port/outputs_iberia/*future*
 # Claude scratch
 .claude/.cache/
 .claude/local/
+
+# Reference PDFs that shouldn't be tracked
+*Confluence Wiki*.pdf
