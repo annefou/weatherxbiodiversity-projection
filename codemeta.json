@@ -5,7 +5,7 @@
   "description": "Projecting Iberian bumble bee extirpation risk under SSP3-7.0 using the validated Soroye 2020 mechanism applied to Destination Earth Climate DT",
   "version": "0.1.0",
   "dateCreated": "2026-05-09",
-  "dateModified": "2026-05-09",
+  "dateModified": "2026-05-10",
   "license": "https://spdx.org/licenses/MIT",
   "codeRepository": "https://github.com/annefou/weatherxbiodiversity-projection",
   "identifier": "{{ZENODO_DOI}}",

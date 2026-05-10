@@ -10,7 +10,7 @@ authors:
 repository-code: "https://github.com/annefou/weatherxbiodiversity-projection"
 license: MIT
 version: "0.1.0"
-date-released: "2026-05-09"
+date-released: "2026-05-10"
 # After your first GitHub release the Zenodo integration mints a concept DOI.
 # Replace this once available (run /init-template again or edit by hand):
 doi: "{{ZENODO_DOI}}"
