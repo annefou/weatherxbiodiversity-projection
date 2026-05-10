@@ -65,13 +65,17 @@ jobs:
           done
 
       # Glob, not a hard-coded list — new notebooks are picked up automatically.
+      # Per-notebook failures are soft (warning) so MyST still builds the
+      # source view of any notebook that can't execute on CI (e.g. Tier-2
+      # DestinE notebooks without credentials, or substrate-sensitivity
+      # inputs_fetch without sibling repos / Zenodo URLs).
       - name: Execute notebooks
         if: steps.guard.outputs.skip != 'true'
         shell: micromamba-shell {0}
         run: |
           for nb in notebooks/*.ipynb; do
             echo "::group::Executing $nb"
-            jupyter execute --inplace "$nb"
+            jupyter execute --inplace "$nb" || echo "::warning file=$nb::Notebook execution failed; MyST will render source only."
             echo "::endgroup::"
           done
 
