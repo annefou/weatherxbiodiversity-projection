@@ -392,16 +392,16 @@ for h in HORIZONS:
 #
 # Same physical HEALPix cells (vertices computed on the WGS84 ellipsoid
 # via `healpix_geo.nested.vertices(..., ellipsoid="WGS84")`), rendered
-# as native polygons (no resampling, no raster), reprojected by cartopy
-# into two different cartographic projections. Same colormap, same
-# colorbar — only the cartographic CRS differs.
+# as native polygons (no resampling), reprojected by cartopy into two
+# different cartographic projections. Same colormap, same colorbar —
+# only the cartographic CRS differs.
 #
-#   * **Left — WGS84 / PlateCarree (EPSG:4326)**: lon/lat shown directly
-#     as plot x/y. Cell vertices land at their on-WGS84 (lon, lat); the
-#     PlateCarree x-axis is degrees east, y is degrees north. Not
-#     equal-area: at Iberia latitudes (35-44° N) cells appear stretched
-#     east-west by ~1/cos(40°) ≈ 1.31 relative to their true on-sphere
-#     shape. Useful as the "raw HEALPix-on-ellipsoid" view.
+#   * **Left — Mollweide (HEALPix canonical)**: equal-area
+#     pseudocylindrical projection — the canonical HEALPix display
+#     (Górski et al. 2005). Faithful to HEALPix's equal-area
+#     pixelisation. At Iberia scale the curvature is subtle; the
+#     "Mollweide character" is more visible at global scale (see the
+#     standalone Iberia map for the LAEA-only view).
 #
 #   * **Right — ETRS89 / LAEA Europe (EPSG:3035)**: same polygons, but
 #     cartopy reprojects each vertex through Europe's canonical
@@ -409,24 +409,26 @@ for h in HORIZONS:
 #     appear in their true relative areas. **Canonical EEA / Natura
 #     2000 / EUNIS / INSPIRE biodiversity reporting CRS.**
 #
-# Both panels use the SAME polygon rendering (no resampling) so the
-# only thing varying is the projection. Use this figure to answer
-# "does projection choice affect cell shape / relative area?" — yes,
-# noticeably; the high-vs-low η geography is identical, but proportions
-# differ.
+# Both projections are equal-area and both panels render via native
+# polygon transformation (no rendering-method confound). Use this
+# figure to answer "does projection choice affect cell shape / relative
+# area at the regional scale?" — at Iberia size, both equal-area
+# projections give nearly identical visual proportions, with subtle
+# orientation differences (LAEA tilts Iberia toward Europe's centre;
+# Mollweide preserves north-up orientation at Iberia's longitude).
 
 # %%
 def _plot_proj_comparison(horizon: str, raster: np.ndarray) -> Path:
     """Side-by-side same-data, two-projection comparison map.
     Both panels render the same WGS84-ellipsoid HEALPix polygons —
-    only the cartopy projection differs."""
+    only the cartopy projection differs (both equal-area)."""
     fig = plt.figure(figsize=(14, 6))
-    ax_left = fig.add_subplot(1, 2, 1, projection=ccrs.PlateCarree())
+    ax_left = fig.add_subplot(1, 2, 1, projection=ccrs.Mollweide())
     ax_right = fig.add_subplot(1, 2, 2, projection=ccrs.epsg(3035))
 
     pc_left = _draw_healpix_polygons_native(
         ax_left, raster,
-        f"WGS84 / PlateCarree (EPSG:4326) — {HORIZON_TITLES[horizon]}",
+        f"Mollweide (HEALPix canonical) — {HORIZON_TITLES[horizon]}",
     )
     pc_right = _draw_healpix_polygons_native(
         ax_right, raster,
