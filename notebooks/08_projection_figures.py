@@ -49,6 +49,11 @@ import numpy as np
 import xarray as xr
 import healpix_plot
 from healpix_plot import HealpixGrid
+# healpix_geo.nested.vertices is the canonical way to get the 4 corners
+# of each HEALPix cell on a chosen ellipsoid (sphere | WGS84). Used for
+# the native-polygon rendering in the projection-comparison figure.
+from healpix_geo.nested import vertices as hp_vertices
+from matplotlib.collections import PolyCollection
 
 # %%
 plt.style.use("seaborn-v0_8-whitegrid")
@@ -112,6 +117,14 @@ for h in HORIZONS:
 # %%
 HPX_GRID = HealpixGrid(level=DEPTH, indexing_scheme="nested", ellipsoid="WGS84")
 print(f"HealpixGrid: level={DEPTH} (nside={2**DEPTH}), NESTED, WGS84")
+
+# Pre-compute the on-WGS84 cell vertices once. Used by the native-polygon
+# rendering in the projection-comparison figure (lets cartopy reproject
+# the WGS84 vertices through any target CRS).
+_lon_v, _lat_v = hp_vertices(IBERIA_PIX_64, DEPTH, ellipsoid="WGS84")
+_lon_v = np.where(_lon_v > 180.0, _lon_v - 360.0, _lon_v)
+WGS84_POLY_XY = np.stack([_lon_v, _lat_v], axis=-1)   # (N_64, 4, 2)
+print(f"WGS84 cell-vertex polygon array: shape={WGS84_POLY_XY.shape}")
 
 # %% [markdown]
 # ## Helper: ranked bar chart on a given matplotlib axis
@@ -284,6 +297,58 @@ plt.show()
 print(f"Saved {out}")
 
 # %% [markdown]
+# ## Native-polygon HEALPix-on-WGS84 helper
+#
+# Renders the 110 nside=64 cells as their actual on-WGS84 quadrilateral
+# polygons (vertices from `healpix_geo.nested.vertices(..., ellipsoid="WGS84")`).
+# Lets cartopy reproject the polygon edges into whatever the axis CRS is,
+# so the same physical cells can be visualised in PlateCarree (lon/lat
+# direct), LAEA Europe, etc. NO RESAMPLING — preserves cell-boundary
+# geometry exactly as defined by the WGS84 ellipsoid + HEALPix indexing.
+#
+# (Contrast with `_draw_healpix_map` above which uses
+# `healpix_plot.plot()` to resample onto a regular grid in the axis CRS.
+# That gives a clean continuous raster but loses cell boundaries.)
+
+# %%
+def _draw_healpix_polygons_native(ax, raster_per_cell, title):
+    """Render HEALPix cells as their native WGS84-ellipsoid polygons,
+    reprojected by cartopy into the axis's CRS. Diverging RdBu_r
+    centred on η=0; same colour scaling as `_draw_healpix_map`.
+    """
+    pc = ccrs.PlateCarree()
+    ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=pc)
+    ax.add_feature(cfeature.LAND, facecolor="#f5f5f5", zorder=0)
+    ax.add_feature(cfeature.OCEAN, facecolor="#e8f0fb", zorder=0)
+
+    valid = np.isfinite(raster_per_cell)
+    if valid.sum() == 0:
+        ax.set_title(title + " (no data)", fontsize=11)
+        return None
+
+    span = max(0.5, float(np.nanpercentile(np.abs(raster_per_cell), 98)))
+
+    polys = WGS84_POLY_XY[valid]
+    vals = raster_per_cell[valid]
+    pcoll = PolyCollection(
+        polys,
+        array=vals,
+        cmap="RdBu_r",
+        norm=plt.Normalize(vmin=-span, vmax=+span),
+        edgecolors="black",
+        linewidths=0.15,
+        transform=pc,           # vertices are WGS84 lon/lat → reproject via PlateCarree CRS
+        zorder=1,
+    )
+    ax.add_collection(pcoll)
+    # Coastlines on top of the polygons.
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.6, zorder=3)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.4, linestyle=":", zorder=3)
+    ax.set_title(title, fontsize=11)
+    return pcoll
+
+
+# %% [markdown]
 # ## Figures 2 + 3 — per-cell community-mean risk maps
 
 # %%
@@ -323,50 +388,53 @@ for h in HORIZONS:
 
 
 # %% [markdown]
-# ## Projection comparison — WGS84 / PlateCarree vs ETRS89 / LAEA Europe
+# ## Projection comparison — native HEALPix-on-WGS84 polygons in two CRSs
 #
-# Same η raster, same colormap, same colorbar — different cartographic
-# projections. Demonstrates the visual consequence of the projection
-# choice. Both projections are geographically faithful in their own
-# sense:
+# Same physical HEALPix cells (vertices computed on the WGS84 ellipsoid
+# via `healpix_geo.nested.vertices(..., ellipsoid="WGS84")`), rendered
+# as native polygons (no resampling, no raster), reprojected by cartopy
+# into two different cartographic projections. Same colormap, same
+# colorbar — only the cartographic CRS differs.
 #
-#   * **PlateCarree (WGS84 lon/lat)** — preserves NOTHING (not area,
-#     not angle, not distance). Cells are mapped 1:1 from lon/lat to
-#     plot x/y. At Iberia latitudes (35-44° N) this stretches cells
-#     east-west by a factor of cos(40°) ≈ 1.31 relative to their true
-#     on-sphere shape. **Easy to read; not equal-area; not the
-#     canonical EU choice.**
+#   * **Left — WGS84 / PlateCarree (EPSG:4326)**: lon/lat shown directly
+#     as plot x/y. Cell vertices land at their on-WGS84 (lon, lat); the
+#     PlateCarree x-axis is degrees east, y is degrees north. Not
+#     equal-area: at Iberia latitudes (35-44° N) cells appear stretched
+#     east-west by ~1/cos(40°) ≈ 1.31 relative to their true on-sphere
+#     shape. Useful as the "raw HEALPix-on-ellipsoid" view.
 #
-#   * **ETRS89 / LAEA Europe (EPSG:3035)** — equal-area, low-distortion
-#     for Europe (centred on lat 52° N, lon 10° E). Faithful to
-#     HEALPix's native equal-area pixelisation. **Canonical EEA /
-#     Natura 2000 / EUNIS / INSPIRE biodiversity reporting CRS.**
+#   * **Right — ETRS89 / LAEA Europe (EPSG:3035)**: same polygons, but
+#     cartopy reprojects each vertex through Europe's canonical
+#     equal-area CRS (LAEA centred on lat 52° N, lon 10° E). Cells
+#     appear in their true relative areas. **Canonical EEA / Natura
+#     2000 / EUNIS / INSPIRE biodiversity reporting CRS.**
 #
-# Use this comparison figure when a reader asks "does projection choice
-# affect the apparent spatial pattern?" — answer: not the high-vs-low
-# regions, but absolutely the visual proportions.
+# Both panels use the SAME polygon rendering (no resampling) so the
+# only thing varying is the projection. Use this figure to answer
+# "does projection choice affect cell shape / relative area?" — yes,
+# noticeably; the high-vs-low η geography is identical, but proportions
+# differ.
 
 # %%
 def _plot_proj_comparison(horizon: str, raster: np.ndarray) -> Path:
-    """Side-by-side same-data, two-projection comparison map."""
+    """Side-by-side same-data, two-projection comparison map.
+    Both panels render the same WGS84-ellipsoid HEALPix polygons —
+    only the cartopy projection differs."""
     fig = plt.figure(figsize=(14, 6))
-    proj_left = ccrs.PlateCarree()
-    proj_right = ccrs.epsg(3035)
-    ax_left = fig.add_subplot(1, 2, 1, projection=proj_left)
-    ax_right = fig.add_subplot(1, 2, 2, projection=proj_right)
+    ax_left = fig.add_subplot(1, 2, 1, projection=ccrs.PlateCarree())
+    ax_right = fig.add_subplot(1, 2, 2, projection=ccrs.epsg(3035))
 
-    pc_left = _draw_healpix_map(
+    pc_left = _draw_healpix_polygons_native(
         ax_left, raster,
         f"WGS84 / PlateCarree (EPSG:4326) — {HORIZON_TITLES[horizon]}",
     )
-    pc_right = _draw_healpix_map(
+    pc_right = _draw_healpix_polygons_native(
         ax_right, raster,
         f"ETRS89 / LAEA Europe (EPSG:3035) — {HORIZON_TITLES[horizon]}",
     )
 
-    # Shared colorbar (using the LAEA mappable; both panels share the
-    # same vmin/vmax because _draw_healpix_map computes span from the
-    # raster, which is the same in both calls).
+    # Shared colorbar; both panels use the same RdBu_r mapping with
+    # span computed from the raster, which is the same in both calls.
     if pc_right is not None:
         cbar = fig.colorbar(
             pc_right, ax=[ax_left, ax_right], orientation="horizontal",
@@ -375,8 +443,8 @@ def _plot_proj_comparison(horizon: str, raster: np.ndarray) -> Path:
         cbar.set_label("Community-mean η (log-odds of extirpation)")
 
     fig.suptitle(
-        f"Iberian Bombus extirpation projection — projection comparison "
-        f"({HORIZON_TITLES[horizon]})",
+        f"Iberian Bombus extirpation projection — native HEALPix polygons, "
+        f"two CRSs ({HORIZON_TITLES[horizon]})",
         fontsize=13,
     )
     fig.text(
