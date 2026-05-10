@@ -46,7 +46,9 @@ def main(horizon: str):
                 rho_grid[i, j] = r
 
     fig, ax = plt.subplots(figsize=(7.0, 4.2), dpi=150)
-    im = ax.imshow(rho_grid, vmin=0.0, vmax=1.0, cmap="RdYlGn", aspect="auto")
+    # RdYlBu is ColorBrewer's colorblind-safe red-to-blue diverging:
+    # low concordance (vmin=0) = red (bad); high concordance (vmax=1) = blue (good).
+    im = ax.imshow(rho_grid, vmin=0.0, vmax=1.0, cmap="RdYlBu", aspect="auto")
     ax.set_xticks(range(len(n_filters)))
     ax.set_xticklabels(
         [f"≥{n}\n(n={ns})" for n, ns in zip(n_filters, n_species_per_filter)]
@@ -62,7 +64,9 @@ def main(horizon: str):
         for j in range(len(n_filters)):
             v = rho_grid[i, j]
             if not np.isnan(v):
-                color = "white" if v < 0.5 else "black"
+                # RdYlBu is dark at both ends (red, blue), light in the
+                # middle (yellow). White text on dark, black text on light.
+                color = "white" if (v < 0.30 or v > 0.75) else "black"
                 ax.text(j, i, f"{v:+.2f}", ha="center", va="center", color=color, fontsize=9)
     cbar = fig.colorbar(im, ax=ax, label="Spearman ρ (rank concordance)")
     fig.tight_layout()
@@ -87,7 +91,10 @@ def main(horizon: str):
     n_min = np.minimum(df["n_cells_64"], df["n_cells_128"]).astype(float)
     n_top = float(max(n_min.max(), 20)) + 1
     bin_edges = [1, 5, 10, 20, n_top]
-    bin_colors = ["#d73027", "#fdae61", "#a6d96a", "#1a9850"]
+    # Okabe–Ito palette — colorblind-safe across deuteranopia, protanopia,
+    # tritanopia, AND luminance-distinguishable in grayscale. Warm-to-cool
+    # progression preserves the "bad → good" reading order.
+    bin_colors = ["#D55E00", "#E69F00", "#56B4E9", "#0072B2"]
     bin_labels = ["n<5\n(unreliable)", "n=5–9\n(borderline)", "n=10–19\n(reliable)", "n≥20\n(very reliable)"]
     cmap = plt.matplotlib.colors.ListedColormap(bin_colors)
     norm = plt.matplotlib.colors.BoundaryNorm(bin_edges, cmap.N)
