@@ -73,20 +73,22 @@ jobs:
             jupytext --to notebook "$nb"
           done
 
-      # Glob, not a hard-coded list — new notebooks are picked up automatically.
-      # Per-notebook failures are soft (warning) so MyST still builds the
-      # source view of any notebook that can't execute on CI (e.g. Tier-2
-      # DestinE notebooks without credentials, or substrate-sensitivity
-      # inputs_fetch without sibling repos / Zenodo URLs).
-      - name: Execute notebooks
-        if: steps.guard.outputs.skip != 'true'
-        shell: micromamba-shell {0}
-        run: |
-          for nb in notebooks/*.ipynb; do
-            echo "::group::Executing $nb"
-            jupyter execute --inplace "$nb" || echo "::warning file=$nb::Notebook execution failed; MyST will render source only."
-            echo "::endgroup::"
-          done
+      # We deliberately skip jupyter execute on CI. Notebooks in this repo
+      # depend on data that is not available on a generic GitHub Actions
+      # runner (Tier-2 DestinE Climate DT credentials; substrate-sensitivity
+      # inputs from sibling repos / Zenodo). Partial executions produce
+      # broken inline outputs (empty subplots, half-filled figures) AND
+      # overwrite the committed figures/*.png in the workspace, which then
+      # get rendered by MyST instead of the committed canonical versions.
+      #
+      # Instead: each chapter embeds its committed figures as markdown
+      # image refs (../figures/...) so MyST renders the canonical PNGs
+      # directly from the repo. Source-code cells render as code, markdown
+      # cells render normally, and there are no broken cell outputs.
+      #
+      # To re-enable execution per-notebook, commit a pre-executed .ipynb
+      # alongside the .py — jupytext --to notebook will pick up the
+      # existing .ipynb if present.
 
       - uses: actions/setup-node@v4
         if: steps.guard.outputs.skip != 'true'
