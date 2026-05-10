@@ -22,6 +22,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from _dggs_metadata import PROJECT_DGGS_ATTRS
+
 ROOT = Path(__file__).resolve().parent.parent
 HEALPIX_PORT = ROOT / 'healpix_port'
 OUT_DIR = HEALPIX_PORT / 'outputs_iberia'
@@ -202,7 +204,7 @@ sprich_recent_int = np.where(
 ds = xr.Dataset(
     data_vars={
         'presence': (
-            ('period_season', 'species', 'cell'),
+            ('period_season', 'species', 'cells'),
             presence_psc,
             {
                 'long_name': 'raw species presence per (period_season, species, cell)',
@@ -215,7 +217,7 @@ ds = xr.Dataset(
             },
         ),
         'presence_absence': (
-            ('period_season', 'species', 'cell'),
+            ('period_season', 'species', 'cells'),
             prab_psc,
             {
                 'long_name': 'inferred presence/absence per (period_season, species, cell)',
@@ -228,7 +230,7 @@ ds = xr.Dataset(
             },
         ),
         'prab_baseline': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             prab_baseline.astype(np.float32),
             {
                 'long_name': 'baseline-period (1901-1974) inferred presence/absence',
@@ -237,7 +239,7 @@ ds = xr.Dataset(
             },
         ),
         'prab_recent': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             prab_recent.astype(np.float32),
             {
                 'long_name': 'recent-period (2000-2014) inferred presence/absence',
@@ -246,7 +248,7 @@ ds = xr.Dataset(
             },
         ),
         'species_richness_baseline': (
-            ('cell',),
+            ('cells',),
             sprich_baseline_int,
             {
                 'long_name': 'number of species observed per cell in baseline period',
@@ -255,7 +257,7 @@ ds = xr.Dataset(
             },
         ),
         'species_richness_recent': (
-            ('cell',),
+            ('cells',),
             sprich_recent_int,
             {
                 'long_name': 'number of species observed per cell in recent period',
@@ -264,7 +266,7 @@ ds = xr.Dataset(
             },
         ),
         'lon': (
-            ('cell',),
+            ('cells',),
             iberia_lon.astype(np.float32),
             {
                 'long_name': 'HEALPix cell-centre longitude',
@@ -273,7 +275,7 @@ ds = xr.Dataset(
             },
         ),
         'lat': (
-            ('cell',),
+            ('cells',),
             iberia_lat.astype(np.float32),
             {
                 'long_name': 'HEALPix cell-centre latitude',
@@ -285,8 +287,7 @@ ds = xr.Dataset(
     coords={
         'period_season': np.array(period_seasons, dtype='U5'),
         'species': np.array(species_list, dtype=object),
-        'cell': iberia_cells_hp.astype(np.int64),
-    },
+        "cell_ids": ("cells", iberia_cells_hp.astype(np.int64)),    },
     attrs={
         'Conventions': 'CF-1.10',
         'title': 'Iberian Bombus presence/absence on HEALPix nside=64 NESTED',
@@ -295,15 +296,12 @@ ds = xr.Dataset(
             f'Created {date.today().isoformat()} by '
             'healpix_port/02_presence_absence_healpix.py'
         ),
-        'healpix_nside': NSIDE,
-        'healpix_depth': DEPTH,
-        'healpix_scheme': 'NESTED',
-        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        **PROJECT_DGGS_ATTRS,    # DGGS Zarr Convention v1 — see _dggs_metadata.py
         'n_cells': n_cells,
     },
 )
 
-ds['cell'].attrs.update({
+ds['cell_ids'].attrs.update({
     'long_name': 'HEALPix NESTED pixel index (nside=64)',
     'description': 'Iberian-mask cell indices into the global HEALPix-NESTED nside=64 sphere',
 })

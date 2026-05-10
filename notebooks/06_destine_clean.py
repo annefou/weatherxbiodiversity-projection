@@ -72,6 +72,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+# Make the healpix_port package importable when run with cwd=notebooks/
+import sys as _sys
+_sys.path.insert(0, str(Path("..").resolve()))
+from healpix_port._dggs_metadata import PROJECT_DGGS_ATTRS  # noqa: E402
+
 # %%
 ROOT = Path("..").resolve()
 GRIB_DIR = ROOT / "data" / "destine" / "raw"
@@ -133,7 +138,7 @@ TEI_bs_hist = hist["tei_bs"].values        # (n_spp, 110)
 PEI_bs_hist = hist["pei_bs"].values
 avgtemp_bs_hist = hist["avgtemp_bs"].values   # (110,)
 avgprecip_bs_hist = hist["avgprecip_bs"].values
-iberia_cells_hp = hist["cell"].values.astype(np.uint64)
+iberia_cells_hp = hist["cell_ids"].values.astype(np.uint64)
 print(f"Loaded historical niche limits: {n_spp} species, {len(iberia_cells_hp)} cells")
 
 # Sanity: iberia_cells_hp must equal IBERIA_PIX_64 (Tier-1 was fitted
@@ -419,7 +424,7 @@ for horizon in HORIZONS:
         data_vars={
             # Tier-1 historical baselines carried verbatim:
             "tei_bs": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 TEI_bs_hist.astype(np.float32),
                 {
                     "long_name": "Climatic Position Index (thermal) baseline 1901-1974",
@@ -429,7 +434,7 @@ for horizon in HORIZONS:
                 },
             ),
             "pei_bs": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 PEI_bs_hist.astype(np.float32),
                 {
                     "long_name": "Climatic Position Index (precipitation) baseline 1901-1974",
@@ -439,7 +444,7 @@ for horizon in HORIZONS:
                 },
             ),
             "avgtemp_bs": (
-                ("cell",),
+                ('cells',),
                 avgtemp_bs_hist.astype(np.float32),
                 {
                     "long_name": "baseline mean annual temperature",
@@ -448,7 +453,7 @@ for horizon in HORIZONS:
                 },
             ),
             "avgprecip_bs": (
-                ("cell",),
+                ('cells',),
                 avgprecip_bs_hist.astype(np.float32),
                 {
                     "long_name": "baseline mean annual total precipitation",
@@ -458,7 +463,7 @@ for horizon in HORIZONS:
             ),
             # DestinE-derived future climate:
             "tei_future": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 TEI_future.astype(np.float32),
                 {
                     "long_name": (
@@ -469,7 +474,7 @@ for horizon in HORIZONS:
                 },
             ),
             "pei_future": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 PEI_future.astype(np.float32),
                 {
                     "long_name": (
@@ -480,7 +485,7 @@ for horizon in HORIZONS:
                 },
             ),
             "tei_delta": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 TEI_delta_future,
                 {
                     "long_name": "Delta thermal CPI (future minus baseline)",
@@ -489,7 +494,7 @@ for horizon in HORIZONS:
                 },
             ),
             "pei_delta": (
-                ("species", "cell"),
+                ('species', 'cells'),
                 PEI_delta_future,
                 {
                     "long_name": "Delta precipitation CPI (future minus baseline)",
@@ -498,7 +503,7 @@ for horizon in HORIZONS:
                 },
             ),
             "avgtemp_delta": (
-                ("cell",),
+                ('cells',),
                 avgtemp_delta_future,
                 {
                     "long_name": "delta annual mean temperature (future minus baseline)",
@@ -507,7 +512,7 @@ for horizon in HORIZONS:
                 },
             ),
             "avgprecip_delta": (
-                ("cell",),
+                ('cells',),
                 avgprecip_delta_future,
                 {
                     "long_name": "delta annual total precipitation (future minus baseline)",
@@ -516,7 +521,7 @@ for horizon in HORIZONS:
                 },
             ),
             "meanT_future": (
-                ("cell",),
+                ('cells',),
                 meanT_future_64.astype(np.float32),
                 {
                     "long_name": (
@@ -527,7 +532,7 @@ for horizon in HORIZONS:
                 },
             ),
             "meanP_future": (
-                ("cell",),
+                ('cells',),
                 meanP_future_64.astype(np.float32),
                 {
                     "long_name": (
@@ -576,8 +581,7 @@ for horizon in HORIZONS:
         },
         coords={
             "species": np.array(species, dtype=object),
-            "cell": IBERIA_PIX_64.astype(np.int64),
-        },
+            "cell_ids": ("cells", IBERIA_PIX_64.astype(np.int64)),        },
         attrs={
             "Conventions": "CF-1.10",
             "title": (
@@ -602,15 +606,12 @@ for horizon in HORIZONS:
                 f"Created {date.today().isoformat()} by "
                 "notebooks/06_destine_clean.py"
             ),
-            "healpix_nside": 64,
-            "healpix_depth": 6,
-            "healpix_scheme": "NESTED",
-            "healpix_lonlat_convention": "WGS84, lon in [-180, 180]",
+            **PROJECT_DGGS_ATTRS,    # DGGS Zarr Convention v1 — see healpix_port/_dggs_metadata.py
             "tp_hourly_to_daily_factor": TP_HOURLY_TO_DAILY_FACTOR,
             "n_cells": int(N_64),
         },
     )
-    ds_out["cell"].attrs.update({
+    ds_out["cell_ids"].attrs.update({
         "long_name": "HEALPix NESTED pixel index (nside=64)",
     })
     ds_out["species"].attrs.update({"long_name": "Bombus species binomial epithet"})

@@ -55,6 +55,11 @@ import arviz as az
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+# Make the healpix_port package importable when run with cwd=notebooks/
+import sys as _sys
+_sys.path.insert(0, str(Path("..").resolve()))
+from healpix_port._dggs_metadata import PROJECT_DGGS_ATTRS  # noqa: E402
 # scipy.special.expit intentionally NOT imported — we report the GLMM
 # linear predictor η directly, not its logistic transform. See the
 # "We REPORT η directly" comment in the per-species inner loop, and
@@ -367,13 +372,13 @@ for horizon in HORIZONS:
     # Use Tier-1 cell-centre lon/lat from presence_absence_healpix.nc.
     lon_cell = pa["lon"].values.astype(np.float32)
     lat_cell = pa["lat"].values.astype(np.float32)
-    cell_idx = pa["cell"].values.astype(np.int64)
+    cell_idx = pa["cell_ids"].values.astype(np.int64)
 
     decade_label = horizon.replace("_", "-")
     raster_ds = xr.Dataset(
         data_vars={
             "community_mean_eta": (
-                ("cell",),
+                ('cells',),
                 eta_per_cell_mean.astype(np.float32),
                 {
                     "long_name": (
@@ -381,6 +386,7 @@ for horizon in HORIZONS:
                         "log-odds of extirpation) under SSP3-7.0"
                     ),
                     "units": "1",
+                    "grid_mapping": "crs_wgs84",
                     "comment": (
                         f"Mean η across {len(species_in_parquet)} species, "
                         f"each species' contribution averaged over {N_DRAWS} "
@@ -393,8 +399,36 @@ for horizon in HORIZONS:
                     "_FillValue": np.float32(np.nan),
                 },
             ),
+            # CF grid_mapping container — declares the coordinate
+            # reference system. WGS84 (EPSG:4326) for the lon/lat
+            # cell-centre coords; analytical/visualisation projection
+            # is ETRS89 / LAEA Europe (EPSG:3035) via ccrs.epsg(3035).
+            "crs_wgs84": (
+                (),
+                np.int8(0),
+                {
+                    "grid_mapping_name": "latitude_longitude",
+                    "long_name": "CRS for cell-centre lon/lat coordinates",
+                    "longitude_of_prime_meridian": 0.0,
+                    "semi_major_axis": 6378137.0,
+                    "inverse_flattening": 298.257223563,
+                    "epsg_code": "EPSG:4326",
+                    "crs_wkt": (
+                        'GEOGCRS["WGS 84",DATUM["World Geodetic System 1984",'
+                        'ELLIPSOID["WGS 84",6378137,298.257223563]],'
+                        'CS[ellipsoidal,2],AXIS["latitude",north],'
+                        'AXIS["longitude",east],ID["EPSG",4326]]'
+                    ),
+                    "comment": (
+                        "Analytical / visualisation projection for figures "
+                        "and downstream EU-biodiversity reporting is "
+                        "ETRS89 / LAEA Europe (EPSG:3035) — the canonical "
+                        "EEA / Natura 2000 / EUNIS / INSPIRE equal-area grid."
+                    ),
+                },
+            ),
             "lon": (
-                ("cell",),
+                ('cells',),
                 lon_cell,
                 {
                     "long_name": "HEALPix cell-centre longitude",
@@ -403,7 +437,7 @@ for horizon in HORIZONS:
                 },
             ),
             "lat": (
-                ("cell",),
+                ('cells',),
                 lat_cell,
                 {
                     "long_name": "HEALPix cell-centre latitude",
@@ -412,7 +446,7 @@ for horizon in HORIZONS:
                 },
             ),
             "n_species_in_cell": (
-                ("cell",),
+                ('cells',),
                 n_species_per_cell.astype(np.int32),
                 {
                     "long_name": (
@@ -424,7 +458,7 @@ for horizon in HORIZONS:
                 },
             ),
         },
-        coords={"cell": cell_idx},
+        coords={"cell_ids": ("cells", cell_idx)},
         attrs={
             "Conventions": "CF-1.10",
             "title": (
@@ -439,15 +473,13 @@ for horizon in HORIZONS:
                 "DestinE Climate DT redistribution restricted; per-cell "
                 "raster is gitignored under data licence"
             ),
-            "healpix_nside": 64,
-            "healpix_depth": 6,
-            "healpix_scheme": "NESTED",
+            **PROJECT_DGGS_ATTRS,    # DGGS Zarr Convention v1 — see healpix_port/_dggs_metadata.py
             "history": (
                 f"Created by notebooks/07_projection.py for horizon {horizon}"
             ),
         },
     )
-    raster_ds["cell"].attrs.update({
+    raster_ds["cell_ids"].attrs.update({
         "long_name": "HEALPix NESTED pixel index (nside=64)",
     })
     raster_ds.to_netcdf(

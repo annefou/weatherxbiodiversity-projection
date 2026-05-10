@@ -29,6 +29,8 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
+
+from _dggs_metadata import PROJECT_DGGS_ATTRS
 from scipy.ndimage import map_coordinates
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -108,8 +110,8 @@ species = [str(s) for s in pa['species'].values]
 prab_baseline = pa['prab_baseline'].values         # (n_spp, n_cells)
 iberia_lon = pa['lon'].values.astype(np.float64)   # cell-centre lon, [-180, 180]
 iberia_lat = pa['lat'].values.astype(np.float64)   # cell-centre lat
-iberia_cells_hp = pa['cell'].values.astype(np.uint64)
-n_cells = int(pa.sizes['cell'])
+iberia_cells_hp = pa['cell_ids'].values.astype(np.uint64)
+n_cells = int(pa.sizes['cells'])
 n_spp = len(species)
 print(f'  {n_cells} cells, {n_spp} species')
 
@@ -228,7 +230,7 @@ meanP_rc_arr = meanP_rc.astype(np.float32)
 ds = xr.Dataset(
     data_vars={
         'tei_bs': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             TEI_bs.astype(np.float32),
             {
                 'long_name': 'Climatic Position Index (thermal) baseline 1901-1974',
@@ -237,7 +239,7 @@ ds = xr.Dataset(
             },
         ),
         'tei_rc': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             TEI_rc_arr,
             {
                 'long_name': 'Climatic Position Index (thermal) recent 2000-2014',
@@ -246,7 +248,7 @@ ds = xr.Dataset(
             },
         ),
         'tei_delta': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             TEI_delta.astype(np.float32),
             {
                 'long_name': 'Delta thermal CPI = recent minus baseline',
@@ -255,7 +257,7 @@ ds = xr.Dataset(
             },
         ),
         'pei_bs': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             PEI_bs.astype(np.float32),
             {
                 'long_name': 'Climatic Position Index (precipitation) baseline 1901-1974',
@@ -264,7 +266,7 @@ ds = xr.Dataset(
             },
         ),
         'pei_rc': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             PEI_rc_arr,
             {
                 'long_name': 'Climatic Position Index (precipitation) recent 2000-2014',
@@ -273,7 +275,7 @@ ds = xr.Dataset(
             },
         ),
         'pei_delta': (
-            ('species', 'cell'),
+            ('species', 'cells'),
             PEI_delta.astype(np.float32),
             {
                 'long_name': 'Delta precipitation CPI = recent minus baseline',
@@ -318,7 +320,7 @@ ds = xr.Dataset(
             },
         ),
         'meanT_bs': (
-            ('cell',),
+            ('cells',),
             meanT_bs.astype(np.float32),
             {
                 'long_name': 'baseline-period mean annual temperature',
@@ -327,7 +329,7 @@ ds = xr.Dataset(
             },
         ),
         'meanT_rc': (
-            ('cell',),
+            ('cells',),
             meanT_rc_arr,
             {
                 'long_name': 'recent-period mean annual temperature',
@@ -336,7 +338,7 @@ ds = xr.Dataset(
             },
         ),
         'meanP_bs': (
-            ('cell',),
+            ('cells',),
             meanP_bs.astype(np.float32),
             {
                 'long_name': 'baseline-period mean annual total precipitation',
@@ -345,7 +347,7 @@ ds = xr.Dataset(
             },
         ),
         'meanP_rc': (
-            ('cell',),
+            ('cells',),
             meanP_rc_arr,
             {
                 'long_name': 'recent-period mean annual total precipitation',
@@ -356,7 +358,7 @@ ds = xr.Dataset(
         # Aliased convenience names (matching the legacy npz keys for
         # downstream scripts that still refer to avgtemp_*).
         'avgtemp_bs': (
-            ('cell',),
+            ('cells',),
             avgtemp_bs.astype(np.float32),
             {
                 'long_name': 'baseline mean annual temperature (alias of meanT_bs)',
@@ -365,7 +367,7 @@ ds = xr.Dataset(
             },
         ),
         'avgtemp_delta': (
-            ('cell',),
+            ('cells',),
             avgtemp_delta.astype(np.float32),
             {
                 'long_name': 'delta annual mean temperature (recent minus baseline)',
@@ -374,7 +376,7 @@ ds = xr.Dataset(
             },
         ),
         'avgprecip_bs': (
-            ('cell',),
+            ('cells',),
             avgprecip_bs.astype(np.float32),
             {
                 'long_name': 'baseline mean annual total precipitation (alias of meanP_bs)',
@@ -383,7 +385,7 @@ ds = xr.Dataset(
             },
         ),
         'avgprecip_delta': (
-            ('cell',),
+            ('cells',),
             avgprecip_delta.astype(np.float32),
             {
                 'long_name': 'delta annual total precipitation (recent minus baseline)',
@@ -394,8 +396,7 @@ ds = xr.Dataset(
     },
     coords={
         'species': np.array(species, dtype=object),
-        'cell': iberia_cells_hp.astype(np.int64),
-    },
+        "cell_ids": ("cells", iberia_cells_hp.astype(np.int64)),    },
     attrs={
         'Conventions': 'CF-1.10',
         'title': (
@@ -408,16 +409,13 @@ ds = xr.Dataset(
             f'Created {date.today().isoformat()} by '
             'healpix_port/04_climate_tei_pei_healpix.py'
         ),
-        'healpix_nside': 64,
-        'healpix_depth': 6,
-        'healpix_scheme': 'NESTED',
-        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        **PROJECT_DGGS_ATTRS,    # DGGS Zarr Convention v1 — see _dggs_metadata.py
         'n_cells': n_cells,
         'baseline_period': '1901-1974',
         'recent_period': '2000-2014',
     },
 )
-ds['cell'].attrs.update({
+ds['cell_ids'].attrs.update({
     'long_name': 'HEALPix NESTED pixel index (nside=64)',
 })
 ds['species'].attrs.update({'long_name': 'Bombus species binomial epithet'})

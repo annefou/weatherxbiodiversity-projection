@@ -206,7 +206,7 @@ if results_idata.exists():
 
 # %%
 pa = xr.open_dataset(OUT_DIR / "presence_absence_healpix.nc")
-n_cells_iberia = int(pa.sizes["cell"])
+n_cells_iberia = int(pa.sizes['cells'])
 n_species = int(pa.sizes["species"])
 
 data_ext = pd.read_parquet(parquet_path)

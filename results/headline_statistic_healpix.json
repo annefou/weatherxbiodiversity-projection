@@ -6,10 +6,10 @@
     "n_cells_iberia": 120,
     "n_cells_in_fit": 58,
     "n_species": 31,
-    "sc_TEI_delta_mean": 0.4540556580196923,
-    "sc_TEI_delta_sd": 0.1152038464357436,
-    "p_2sided": 8.103316065222188e-05,
-    "hdi95_low": 0.164,
+    "sc_TEI_delta_mean": 0.454055374459644,
+    "sc_TEI_delta_sd": 0.1152037906732558,
+    "p_2sided": 8.103334772036064e-05,
+    "hdi95_low": 0.137,
     "hdi95_high": 0.746,
     "marginal_R2": null
   },
@@ -34,11 +34,11 @@
     "comment": "HEALPix nside=64 NESTED fit recovers sc_TEI_delta = +0.454 (p = 8.10e-05), within +-30% of weatherxbio v0.2.1's CEA value of +0.479 -- mechanism is substrate-robust at matched ~92 km cell scale."
   },
   "mcmc": {
-    "sc_TEI_delta_mean": 0.444,
-    "sc_TEI_delta_sd": 0.153,
-    "sc_TEI_delta_hdi95_low": 0.164,
+    "sc_TEI_delta_mean": 0.446,
+    "sc_TEI_delta_sd": 0.157,
+    "sc_TEI_delta_hdi95_low": 0.137,
     "sc_TEI_delta_hdi95_high": 0.746,
-    "vb_sd_underestimation_factor": 1.3280806564504568,
+    "vb_sd_underestimation_factor": 1.362802379005807,
     "comment": "MCMC posterior on HEALPix nside=64 substrate -- VB sd is a lower bound on true posterior uncertainty."
   }
 }

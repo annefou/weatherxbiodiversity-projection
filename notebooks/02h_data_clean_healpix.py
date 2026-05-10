@@ -117,8 +117,9 @@ if clean_csv.exists():
 pa_nc = OUT_DIR / "presence_absence_healpix.nc"
 if pa_nc.exists():
     pa = xr.open_dataset(pa_nc)
+    depth = pa.attrs['dggs_grid_refinement_level']
     print(
-        f"\nIberia HEALPix substrate: {int(pa.sizes['cell'])} cells "
-        f"(nside={pa.attrs['healpix_nside']}, "
-        f"depth={pa.attrs['healpix_depth']})"
+        f"\nIberia HEALPix substrate: {int(pa.sizes['cells'])} cells "
+        f"(nside={2**depth}, depth={depth}, "
+        f"scheme={pa.attrs['dggs_grid_indexing_scheme']!r})"
     )

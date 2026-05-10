@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from _dggs_metadata import PROJECT_DGGS_ATTRS
+
 ROOT = Path(__file__).resolve().parent.parent
 HEALPIX_PORT = ROOT / 'healpix_port'
 OUT_DIR = HEALPIX_PORT / 'outputs_iberia'
@@ -31,8 +33,8 @@ print('Loading cleaned data + Iberia cell list ...')
 df = pd.read_csv(IN_CSV)
 
 pa = xr.open_dataset(PA_NC)
-iberia_cells_hp = pa['cell'].values.astype(np.uint64)
-n_cells = int(pa.sizes['cell'])
+iberia_cells_hp = pa['cell_ids'].values.astype(np.uint64)
+n_cells = int(pa.sizes['cells'])
 print(f'  Iberia cells: {n_cells}, occurrences: {len(df):,}')
 
 # Map ipix -> dense Iberia index, mirroring script 02.
@@ -147,7 +149,7 @@ ds = xr.Dataset(
             },
         ),
         'sampling_baseline': (
-            ('cell',),
+            ('cells',),
             samp_baseline.astype(np.float32),
             {
                 'long_name': 'sampling effort summed across baseline-period seasons',
@@ -156,7 +158,7 @@ ds = xr.Dataset(
             },
         ),
         'sampling_recent': (
-            ('cell',),
+            ('cells',),
             samp_recent.astype(np.float32),
             {
                 'long_name': 'sampling effort summed across recent-period seasons',
@@ -165,7 +167,7 @@ ds = xr.Dataset(
             },
         ),
         'sampling_total': (
-            ('cell',),
+            ('cells',),
             samp_total.astype(np.float32),
             {
                 'long_name': 'total sampling effort summed over all six period_seasons',
@@ -178,7 +180,7 @@ ds = xr.Dataset(
             },
         ),
         'continent': (
-            ('cell',),
+            ('cells',),
             continent_int8,
             {
                 'long_name': 'continent index per cell (1=North America, 2=Europe)',
@@ -190,8 +192,7 @@ ds = xr.Dataset(
     },
     coords={
         'period_season': np.array(period_seasons, dtype='U5'),
-        'cell': iberia_cells_hp.astype(np.int64),
-    },
+        "cell_ids": ("cells", iberia_cells_hp.astype(np.int64)),    },
     attrs={
         'Conventions': 'CF-1.10',
         'title': 'Per-cell sampling effort + continent on Iberian HEALPix nside=64 NESTED',
@@ -200,14 +201,11 @@ ds = xr.Dataset(
             f'Created {date.today().isoformat()} by '
             'healpix_port/03_sampling_continent_healpix.py'
         ),
-        'healpix_nside': 64,
-        'healpix_depth': 6,
-        'healpix_scheme': 'NESTED',
-        'healpix_lonlat_convention': 'WGS84, lon in [-180, 180]',
+        **PROJECT_DGGS_ATTRS,    # DGGS Zarr Convention v1 — see _dggs_metadata.py
         'n_cells': n_cells,
     },
 )
-ds['cell'].attrs.update({
+ds['cell_ids'].attrs.update({
     'long_name': 'HEALPix NESTED pixel index (nside=64)',
 })
 ds['period_season'].attrs.update({

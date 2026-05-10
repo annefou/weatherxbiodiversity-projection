@@ -140,7 +140,7 @@ def _plot_panel(ax, df, color, title):
 pa = xr.open_dataset(OUT_DIR / "presence_absence_healpix.nc")
 iberia_lon = pa["lon"].values.astype(float)
 iberia_lat = pa["lat"].values.astype(float)
-n_cells_iberia = int(pa.sizes["cell"])
+n_cells_iberia = int(pa.sizes['cells'])
 
 # Cells that ended up in the fit (extinction subset)
 data_ext = pd.read_parquet(OUT_DIR / "dataGLMM_extinction.parquet")

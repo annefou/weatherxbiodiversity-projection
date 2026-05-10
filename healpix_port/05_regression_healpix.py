@@ -52,7 +52,7 @@ sampling_total = sc['sampling_total'].values
 # preserve the upstream isnan-based gating.
 continent_int = sc['continent'].values.astype(np.int16)
 continent = np.where(continent_int < 0, np.nan, continent_int).astype(np.float32)
-n_cells = int(pa.sizes['cell'])
+n_cells = int(pa.sizes['cells'])
 
 avgtemp_bs = cl['avgtemp_bs'].values
 avgtemp_delta = cl['avgtemp_delta'].values
