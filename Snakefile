@@ -254,6 +254,9 @@ rule destine_clean:
     output:
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.nc",
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.nc",
+        # Option B: nside=128 climate predictors (DestinE-resolution; GLMM still at nside=64)
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix_nside128.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix_nside128.nc",
     log:
         f"{RESULTS}/logs/06_destine_clean.log",
     shell:
@@ -278,10 +281,16 @@ rule projection:
         f"{HPORT}/outputs_iberia/sampling_continent_healpix.nc",
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix.nc",
         f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix.nc",
+        # Option B nside=128 climate predictors (DestinE-resolution maps)
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2020_2029_healpix_nside128.nc",
+        f"{HPORT}/outputs_iberia/climate_tei_pei_future_2030_2039_healpix_nside128.nc",
     output:
         f"{RESULTS}/projection_headline.json",
         f"{RESULTS}/projection_2020_2029.nc",
         f"{RESULTS}/projection_2030_2039.nc",
+        # Option B nside=128 per-cell rasters (GLMM at nside=64, climate at nside=128)
+        f"{RESULTS}/projection_2020_2029_nside128.nc",
+        f"{RESULTS}/projection_2030_2039_nside128.nc",
     log:
         f"{RESULTS}/logs/07_projection.log",
     shell:
@@ -305,6 +314,9 @@ rule projection_figures:
         f"{FIGURES}/projection_proj_comparison_2020_2029.png",
         f"{FIGURES}/projection_proj_comparison_2030_2039.png",
         f"{FIGURES}/projection_summary.png",
+        # Option B nside=128 risk maps (DestinE-resolution)
+        f"{FIGURES}/projection_risk_map_2020_2029_nside128.png",
+        f"{FIGURES}/projection_risk_map_2030_2039_nside128.png",
     log:
         f"{RESULTS}/logs/08_projection_figures.log",
     shell:

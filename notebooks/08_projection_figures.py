@@ -388,6 +388,94 @@ for h in HORIZONS:
 
 
 # %% [markdown]
+# ## Option B nside=128 standalone risk maps (DestinE-resolution)
+#
+# Same per-cell community-mean η as the nside=64 maps above, but at
+# the full DestinE nside=128 resolution (~46 km cells, ~440 in
+# Iberia). The GLMM is unchanged (calibrated at nside=64); the gain
+# is in spatial detail of the climate predictors. Within each nside=64
+# parent the 4 children share the same per-species random effect but
+# their TEI/PEI deltas vary because DestinE provides the finer climate.
+
+# %%
+HPX_GRID_128 = HealpixGrid(level=7, indexing_scheme="nested", ellipsoid="WGS84")
+
+per_cell_128 = {}
+for h in HORIZONS:
+    p = RESULTS_DIR / f"projection_{h}_nside128.nc"
+    if p.exists():
+        ds_p128 = xr.open_dataset(p)
+        per_cell_128[h] = ds_p128["community_mean_eta"].values.astype(float)
+        print(f"  loaded {p.name}: shape {per_cell_128[h].shape}")
+    else:
+        print(f"  [missing] {p}")
+
+# Pre-compute the nside=128 Iberian indices (same as 06's IBERIA_PIX_128).
+IBERIA_PIX_128 = np.load(PRECOMP / "iberia_pix_nside128_nested.npy").astype(np.uint64)
+
+
+def _plot_map_nside128(horizon: str, raster: np.ndarray) -> Path:
+    proj = ccrs.epsg(3035)
+    fig = plt.figure(figsize=(7.5, 6))
+    ax = plt.axes(projection=proj)
+    pc = ccrs.PlateCarree()
+    ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=pc)
+    ax.add_feature(cfeature.LAND, facecolor="#f5f5f5", zorder=0)
+    ax.add_feature(cfeature.OCEAN, facecolor="#e8f0fb", zorder=0)
+
+    valid = np.isfinite(raster)
+    if valid.sum() == 0:
+        ax.set_title(
+            f"Iberian Bombus extirpation risk -- {HORIZON_TITLES[horizon]} "
+            "(nside=128, no data)"
+        )
+        return None
+    span = max(0.5, float(np.nanpercentile(np.abs(raster), 98)))
+
+    img = healpix_plot.plot(
+        cell_ids=IBERIA_PIX_128,
+        data=raster.astype(np.float64),
+        healpix_grid=HPX_GRID_128,
+        sampling_grid={"shape": 800},
+        view=(-10.5, 4.5, 35.0, 44.5),
+        interpolation="nearest",
+        background_value=np.nan,
+        ax=ax,
+        cmap="RdBu_r",
+        vmin=-span,
+        vmax=+span,
+        title=None,
+    )
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.6, zorder=3)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.4, linestyle=":", zorder=3)
+    ax.set_title(
+        f"Iberian Bombus extirpation risk -- {HORIZON_TITLES[horizon]} "
+        "(Option B: nside=128, DestinE resolution)",
+        fontsize=11,
+    )
+    if img is not None:
+        cbar = plt.colorbar(img, ax=ax, orientation="vertical",
+                            fraction=0.04, pad=0.03)
+        cbar.set_label("Community-mean η (log-odds of extirpation)")
+    fig.text(
+        0.5, 0.01, DATA_FOOTER,
+        ha="center", va="bottom", fontsize=8, color="dimgray", style="italic",
+    )
+    fig.tight_layout(rect=[0, 0.03, 1, 1])
+    out = FIG_DIR / f"projection_risk_map_{horizon}_nside128.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.show()
+    return out
+
+
+for h in HORIZONS:
+    if h not in per_cell_128:
+        continue
+    out = _plot_map_nside128(h, per_cell_128[h])
+    print(f"Saved {out}")
+
+
+# %% [markdown]
 # ## Projection comparison — native HEALPix-on-WGS84 polygons in two CRSs
 #
 # Same physical HEALPix cells (vertices computed on the WGS84 ellipsoid

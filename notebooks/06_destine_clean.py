@@ -123,6 +123,15 @@ for j, parent in enumerate(parents_of_children):
 assert (counter == 4).all(), "every parent must have exactly 4 children"
 print("Built (110, 4) child-index lookup for parent-mean aggregation.")
 
+# Inverse lookup: for each position j in IBERIA_PIX_128, the row index
+# of its parent in IBERIA_PIX_64. Used by the Option-B nside=128
+# projection path which inherits historical baselines from the
+# nside=64 GLMM training data per parent.
+parent_row_for_child = np.array(
+    [parent_to_row[int(p)] for p in parents_of_children], dtype=np.int64
+)
+print(f"Built ({N_128},) parent-row lookup for nside=128 child-to-parent inheritance.")
+
 # %% [markdown]
 # ## Historical species niche limits (Tier-1 HEALPix), held fixed
 
@@ -622,6 +631,134 @@ for horizon in HORIZONS:
     }
     ds_out.to_netcdf(out_path, engine="netcdf4", encoding=encoding)
     print(f"  Saved {out_path}")
+
+    # ============================================================
+    # Option B: ALSO produce the nside=128 version (Tier-1 GLMM at
+    # nside=64 unchanged; per-cell future predictors at full DestinE
+    # nside=128 resolution). Per-species historical baselines are
+    # inherited from the nside=64 parent (`parent_row_for_child`),
+    # since the GLMM was calibrated per parent. Future TEI/PEI varies
+    # per nside=128 child because climate is finer.
+    # ============================================================
+    print(f"\n  --- Option B: nside=128 climate predictors ---")
+    meanT_future_128 = mmean128_c.mean(axis=0)               # (N_128,) degC
+    annual_p_128 = np.empty((len(unique_years), N_128))
+    for i, y in enumerate(unique_years):
+        sel = years_p == y
+        annual_p_128[i] = msum128[sel].sum(axis=0)
+    annual_p_128_mm = annual_p_128 * 1000.0 * TP_HOURLY_TO_DAILY_FACTOR
+    meanP_future_128 = annual_p_128_mm.mean(axis=0)          # (N_128,) mm/yr
+
+    # Inherit per-parent baselines for each of the 4 children.
+    TEI_bs_hist_128 = TEI_bs_hist[:, parent_row_for_child]   # (n_spp, N_128)
+    PEI_bs_hist_128 = PEI_bs_hist[:, parent_row_for_child]
+    avgtemp_bs_hist_128 = avgtemp_bs_hist[parent_row_for_child]    # (N_128,)
+    avgprecip_bs_hist_128 = avgprecip_bs_hist[parent_row_for_child]
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        TEI_future_128 = (
+            (meanT_future_128[np.newaxis, :] - T_min_spp[:, np.newaxis])
+            / T_range[:, np.newaxis]
+        )
+        PEI_future_128 = (
+            (meanP_future_128[np.newaxis, :] - P_min_spp[:, np.newaxis])
+            / P_range[:, np.newaxis]
+        )
+
+    TEI_delta_128 = (TEI_future_128 - TEI_bs_hist_128).astype(np.float32)
+    PEI_delta_128 = (PEI_future_128 - PEI_bs_hist_128).astype(np.float32)
+    avgtemp_delta_128 = (meanT_future_128 - avgtemp_bs_hist_128).astype(np.float32)
+    avgprecip_delta_128 = (meanP_future_128 - avgprecip_bs_hist_128).astype(np.float32)
+
+    print(
+        f"    meanT_future_128:  {meanT_future_128.min():.2f} .. "
+        f"{meanT_future_128.max():.2f} degC  "
+        f"(median {np.median(meanT_future_128):.2f}; "
+        f"vs nside=64 median {np.median(meanT_future_64):.2f})"
+    )
+    print(
+        f"    avgtemp_delta_128 median: "
+        f"{np.median(avgtemp_delta_128):.3f} degC  "
+        f"(vs nside=64 median {np.median(meanT_future_64 - avgtemp_bs_hist):.3f})"
+    )
+
+    out_path_128 = OUT_DIR / f"climate_tei_pei_future_{horizon}_healpix_nside128.nc"
+    ds128 = xr.Dataset(
+        data_vars={
+            "tei_bs":          (("species", "cells"), TEI_bs_hist_128.astype(np.float32),
+                                {"long_name": "baseline-period TEI (parent-inherited from Tier-1 nside=64)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "tei_future":      (("species", "cells"), TEI_future_128.astype(np.float32),
+                                {"long_name": "future-decade TEI (per-cell at nside=128)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "tei_delta":       (("species", "cells"), TEI_delta_128,
+                                {"long_name": "future − baseline TEI (per-cell at nside=128)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "pei_bs":          (("species", "cells"), PEI_bs_hist_128.astype(np.float32),
+                                {"long_name": "baseline-period PEI (parent-inherited from Tier-1 nside=64)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "pei_future":      (("species", "cells"), PEI_future_128.astype(np.float32),
+                                {"long_name": "future-decade PEI (per-cell at nside=128)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "pei_delta":       (("species", "cells"), PEI_delta_128,
+                                {"long_name": "future − baseline PEI (per-cell at nside=128)",
+                                 "_FillValue": np.float32(np.nan)}),
+            "meanT_future":    (("cells",), meanT_future_128.astype(np.float32),
+                                {"long_name": "decade-mean monthly mean temperature",
+                                 "units": "degC"}),
+            "meanP_future":    (("cells",), meanP_future_128.astype(np.float32),
+                                {"long_name": "decade-mean annual total precipitation",
+                                 "units": "mm year-1"}),
+            "avgtemp_bs":      (("cells",), avgtemp_bs_hist_128.astype(np.float32),
+                                {"long_name": "baseline-period mean annual T (parent-inherited)",
+                                 "units": "degC"}),
+            "avgprecip_bs":    (("cells",), avgprecip_bs_hist_128.astype(np.float32),
+                                {"long_name": "baseline-period annual total precipitation (parent-inherited)",
+                                 "units": "mm year-1"}),
+            "T_min_spp":       (("species",), T_min_spp.astype(np.float32),
+                                {"long_name": "species cold thermal limit (Tier-1, unchanged)",
+                                 "units": "degC"}),
+            "T_max_spp":       (("species",), T_max_spp.astype(np.float32),
+                                {"long_name": "species hot thermal limit (Tier-1, unchanged)",
+                                 "units": "degC"}),
+            "P_min_spp":       (("species",), P_min_spp.astype(np.float32),
+                                {"long_name": "species dry precipitation limit (Tier-1, unchanged)",
+                                 "units": "mm year-1"}),
+            "P_max_spp":       (("species",), P_max_spp.astype(np.float32),
+                                {"long_name": "species wet precipitation limit (Tier-1, unchanged)",
+                                 "units": "mm year-1"}),
+            "parent_row_in_nside64": (("cells",), parent_row_for_child.astype(np.int32),
+                                {"long_name": "row index in nside=64 IBERIA_PIX_64 of this child's parent",
+                                 "comment": "for sampling-effort & RE inheritance in 07"}),
+        },
+        coords={
+            "species": np.array(species, dtype=object),
+            "cell_ids": ("cells", IBERIA_PIX_128.astype(np.int64)),
+        },
+        attrs={
+            "Conventions": "CF-1.10",
+            "title": (
+                f"DestinE Climate DT — Option B nside=128 future TEI/PEI "
+                f"({decade_label}); baseline parent-inherited from Tier-1 nside=64"
+            ),
+            "history": (
+                f"Created {date.today().isoformat()} by notebooks/06_destine_clean.py "
+                "(Option B: GLMM at nside=64, climate predictors at nside=128)"
+            ),
+            "horizon": decade_label,
+            "license_note": "DestinE Climate DT redistribution restricted; this file is gitignored.",
+            **{**PROJECT_DGGS_ATTRS, "dggs_grid_refinement_level": 7},  # nside=128 → depth=7
+            "tp_hourly_to_daily_factor": TP_HOURLY_TO_DAILY_FACTOR,
+            "n_cells": int(N_128),
+        },
+    )
+    ds128["cell_ids"].attrs.update({
+        "long_name": "HEALPix NESTED pixel index (nside=128)",
+    })
+    ds128["species"].attrs.update({"long_name": "Bombus species binomial epithet"})
+    enc128 = {name: {"zlib": True, "complevel": 4} for name in ds128.data_vars}
+    ds128.to_netcdf(out_path_128, engine="netcdf4", encoding=enc128)
+    print(f"    Saved {out_path_128}")
 
     # Diagnostics, restricted to cells with at least one species
     # historically observed (sampling_continent_healpix.nc active mask).

@@ -513,6 +513,188 @@ for horizon in HORIZONS:
         )
 
 # %% [markdown]
+# ## Option B — nside=128 projection (DestinE-resolution maps)
+#
+# Same GLMM (calibrated at nside=64), evaluated on the nside=128 climate
+# predictors produced by `06_destine_clean.py`. Per-species historical
+# baselines and sampling effort are parent-inherited (each nside=128
+# child gets its nside=64 parent's value); per-cell future TEI/PEI
+# varies per nside=128 cell because DestinE climate is at nside=128.
+# The species-rank stays approximately the same as the nside=64 path;
+# the gain is in the spatial resolution of the per-cell raster.
+#
+# Headline ranking remains nside=64 in `horizons` (substrate-robustness
+# anchor); nside=128 ranking is added under `horizons_nside128` for
+# direct comparison.
+
+# %%
+projection_summary["horizons_nside128"] = {}
+
+for horizon in HORIZONS:
+    src128 = OUT_DIR / f"climate_tei_pei_future_{horizon}_healpix_nside128.nc"
+    if not src128.exists():
+        print(f"[skip] {src128.name} missing — run 06_destine_clean.py first.")
+        continue
+    fut128 = xr.open_dataset(src128)
+    parent_row = fut128["parent_row_in_nside64"].values.astype(np.int64)
+    n128 = fut128.sizes["cells"]
+    fut128_species = [str(s) for s in fut128["species"].values]
+    print(f"\n=== Option B nside=128 projection: {horizon} ({n128} cells) ===")
+
+    # Reorder future arrays to match dataGLMM species order.
+    spp_idx = [fut128_species.index(sp) for sp in species_in_parquet]
+    tei_bs128 = fut128["tei_bs"].values[spp_idx, :]
+    tei_dl128 = fut128["tei_delta"].values[spp_idx, :]
+    pei_bs128 = fut128["pei_bs"].values[spp_idx, :]
+    pei_dl128 = fut128["pei_delta"].values[spp_idx, :]
+
+    # Sampling effort per nside=128 cell: inherit from parent.
+    sampling_128 = sampling[parent_row]
+    active_128 = ~np.isnan(sampling_128)
+    n_active_128 = int(active_128.sum())
+    print(f"  Active nside=128 cells (sampled at parent): {n_active_128}/{n128}")
+
+    # Historical observation mask per species, inherited.
+    prab_bs_128 = prab_baseline[:, parent_row]    # (31, N_128)
+    prab_rc_128 = prab_recent[:, parent_row]
+    prab_bs_128_idx = np.array(
+        [prab_species_list.index(sp) for sp in species_in_parquet]
+    )
+    prab_bs_128 = prab_bs_128[prab_bs_128_idx, :]
+    prab_rc_128 = prab_rc_128[prab_bs_128_idx, :]
+
+    eta_per_cell_sum_128 = np.zeros(n128, dtype=np.float64)
+    n_species_per_cell_128 = np.zeros(n128, dtype=np.int64)
+    species_records_128 = []
+
+    for i, sp in enumerate(species_in_parquet):
+        observed = ((prab_bs_128[i] > 0) | (prab_rc_128[i] > 0))
+        cell_mask_128 = observed & active_128
+        if cell_mask_128.sum() == 0:
+            continue
+
+        tei_bs_v = tei_bs128[i, cell_mask_128]
+        tei_dl_v = tei_dl128[i, cell_mask_128]
+        pei_bs_v = pei_bs128[i, cell_mask_128]
+        pei_dl_v = pei_dl128[i, cell_mask_128]
+        sampling_v = sampling_128[cell_mask_128]
+        valid = (np.isfinite(tei_bs_v) & np.isfinite(tei_dl_v)
+                 & np.isfinite(pei_bs_v) & np.isfinite(pei_dl_v)
+                 & np.isfinite(sampling_v))
+        if valid.sum() == 0:
+            continue
+
+        cell_full_idx = np.flatnonzero(cell_mask_128)[valid]
+        sc_TEI_bs_v = _z(tei_bs_v[valid], "TEI_bs")
+        sc_TEI_delta_v = _z(tei_dl_v[valid], "TEI_delta")
+        sc_PEI_bs_v = _z(pei_bs_v[valid], "PEI_bs")
+        sc_PEI_delta_v = _z(pei_dl_v[valid], "PEI_delta")
+        sc_sampling_v = _z(sampling_v[valid], "sampling")
+
+        X = build_design_row(
+            sc_sampling_v, sc_TEI_bs_v, sc_TEI_delta_v,
+            sc_PEI_bs_v, sc_PEI_delta_v,
+        )
+        eta = X @ beta.T
+        if sp in spp_to_re_col:
+            re_per_draw = species_re_draws[:, spp_to_re_col[sp]]
+            eta = eta + re_per_draw[np.newaxis, :]
+
+        eta_post_mean_per_cell = eta.mean(axis=1)
+        eta_post_per_draw = eta.mean(axis=0)
+        post_mean_eta = float(eta_post_per_draw.mean())
+        hdi = az.hdi(eta_post_per_draw, hdi_prob=0.95)
+        species_records_128.append({
+            "species": sp,
+            "post_mean_eta": post_mean_eta,
+            "eta_hdi95_low": float(hdi[0]),
+            "eta_hdi95_high": float(hdi[1]),
+            "n_cells": int(valid.sum()),
+            "n_cells_eta_gt_0": int((eta_post_mean_per_cell > 0).sum()),
+        })
+        eta_per_cell_sum_128[cell_full_idx] += eta_post_mean_per_cell
+        n_species_per_cell_128[cell_full_idx] += 1
+
+    species_records_128.sort(key=lambda r: -r["post_mean_eta"])
+
+    with np.errstate(invalid="ignore"):
+        eta_per_cell_mean_128 = np.where(
+            n_species_per_cell_128 > 0,
+            eta_per_cell_sum_128 / np.maximum(n_species_per_cell_128, 1),
+            np.nan,
+        )
+
+    # Cell-centre lon/lat at nside=128 — derive from healpix-geo (WGS84).
+    from healpix_port._dggs_metadata import HEALPIX_NSIDE  # noqa
+    from healpix_geo import nested as hpg_nested
+    cell_idx_128 = fut128["cell_ids"].values.astype(np.int64)
+    lon128, lat128 = hpg_nested.healpix_to_lonlat(
+        cell_idx_128.astype(np.uint64), 7, "WGS84"
+    )
+    lon128 = np.where(lon128 > 180.0, lon128 - 360.0, lon128).astype(np.float32)
+    lat128 = lat128.astype(np.float32)
+
+    raster_128_ds = xr.Dataset(
+        data_vars={
+            "community_mean_eta": (
+                ("cells",),
+                eta_per_cell_mean_128.astype(np.float32),
+                {
+                    "long_name": (
+                        "per-cell community-mean GLMM linear predictor (η, "
+                        "log-odds of extirpation) under SSP3-7.0 — Option B "
+                        "nside=128 (DestinE resolution; GLMM at nside=64)"
+                    ),
+                    "units": "1",
+                    "_FillValue": np.float32(np.nan),
+                },
+            ),
+            "lon": (("cells",), lon128,
+                    {"standard_name": "longitude", "units": "degrees_east"}),
+            "lat": (("cells",), lat128,
+                    {"standard_name": "latitude", "units": "degrees_north"}),
+            "n_species_in_cell": (
+                ("cells",),
+                n_species_per_cell_128.astype(np.int32),
+                {"units": "species", "_FillValue": np.int32(-1)},
+            ),
+        },
+        coords={"cell_ids": ("cells", cell_idx_128)},
+        attrs={
+            "Conventions": "CF-1.10",
+            "title": (
+                f"Per-cell community-mean Bombus extirpation η ({horizon.replace('_', '-')}) "
+                "on Iberian HEALPix nside=128 NESTED — Option B"
+            ),
+            "horizon": horizon.replace("_", "-"),
+            "method": "Option B (GLMM at nside=64, climate predictors at nside=128)",
+            "tier1_posterior": "results/posterior_bambi_healpix.nc",
+            "n_posterior_draws": int(N_DRAWS),
+            **{**PROJECT_DGGS_ATTRS, "dggs_grid_refinement_level": 7},
+        },
+    )
+    raster_128_ds.to_netcdf(
+        RESULTS_DIR / f"projection_{horizon}_nside128.nc",
+        engine="netcdf4",
+        encoding={
+            "community_mean_eta": {"zlib": True, "complevel": 4},
+            "lon": {"zlib": True, "complevel": 4},
+            "lat": {"zlib": True, "complevel": 4},
+            "n_species_in_cell": {"zlib": True, "complevel": 4},
+        },
+    )
+    print(f"  Saved results/projection_{horizon}_nside128.nc (gitignored)")
+
+    projection_summary["horizons_nside128"][horizon] = {
+        "n_draws": N_DRAWS,
+        "species_ranked": species_records_128,
+    }
+    print(f"  Top 3 (nside=128): "
+          + ", ".join(f"B. {r['species']} (η={r['post_mean_eta']:+.2f})"
+                      for r in species_records_128[:3]))
+
+
+# %% [markdown]
 # ## Method block + write JSON
 
 # %%
