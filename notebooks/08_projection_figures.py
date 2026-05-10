@@ -19,12 +19,15 @@
 # Produces:
 #
 #   * `figures/projection_species_rank.png` — two-panel ranked bar chart
-#     (near-term left, mid-term right) of per-species posterior-mean
-#     extirpation probability with 95 % HDI error bars; top-3 species
-#     per horizon highlighted in gold.
+#     (near-term left, mid-term right) of per-species posterior-mean η
+#     (GLMM linear predictor / log-odds of extirpation) with 95 % HDI
+#     error bars; top-3 species per horizon highlighted in gold.
+#     η is reported instead of p = expit(η) because future predictors
+#     under SSP3-7.0 lie 5–10× outside the Tier-1 training distribution
+#     where logit saturation makes p uninterpretable.
 #   * `figures/projection_risk_map_2020_2029.png` — Iberia HEALPix
-#     nside=64 risk map of community-mean (over species) extirpation
-#     probability (near-term).
+#     nside=64 risk map of community-mean η, RdBu_r diverging colormap
+#     centred on η = 0 (= moderate-risk threshold p = 0.5).
 #   * `figures/projection_risk_map_2030_2039.png` — same, mid-term.
 #   * `figures/projection_summary.png` — combined panel for the
 #     Jupyter Book / nanopub Outcome draft (rank chart + the more
@@ -82,7 +85,7 @@ for h in HORIZONS:
     p = RESULTS_DIR / f"projection_{h}.nc"
     if p.exists():
         ds_p = xr.open_dataset(p)
-        per_cell[h] = ds_p["community_mean_p_extirpation"].values.astype(float)
+        per_cell[h] = ds_p["community_mean_eta"].values.astype(float)
         print(f"  loaded {p.name}: shape {per_cell[h].shape}")
     else:
         print(f"  [missing] {p}")
@@ -128,11 +131,15 @@ DATA_FOOTER = (
 
 def _plot_rank(ax, records, title, color, order_species=None,
                highlight_species=None):
-    """Horizontal bar chart of per-species posterior-mean p_extirp.
+    """Horizontal bar chart of per-species posterior-mean η (linear
+    predictor / log-odds of extirpation under SSP3-7.0). η is reported
+    instead of p = expit(η) because future predictors lie 5–10× outside
+    the Tier-1 training distribution where logit saturation makes p
+    uninterpretable. See 05_outcome.md § Limitations.
 
     If `order_species` is given, the species are reordered to match
-    (any species not present in `records` are dropped); otherwise
-    the input order of `records` is preserved.
+    (any species not present in `records` are dropped); otherwise the
+    input order of `records` is preserved.
 
     `highlight_species` (set or list) controls which bars are drawn
     in dark gold; defaults to the top-3 species *in the displayed
@@ -144,16 +151,16 @@ def _plot_rank(ax, records, title, color, order_species=None,
     else:
         species = [r["species"] for r in records]
 
-    means = np.array([by_name[sp]["post_mean_p_extirpation"] for sp in species])
-    los = np.array([by_name[sp]["hdi95_low"] for sp in species])
-    his = np.array([by_name[sp]["hdi95_high"] for sp in species])
+    means = np.array([by_name[sp]["post_mean_eta"] for sp in species])
+    los = np.array([by_name[sp]["eta_hdi95_low"] for sp in species])
+    his = np.array([by_name[sp]["eta_hdi95_high"] for sp in species])
 
     y = np.arange(len(species))
     err = np.vstack([means - los, his - means])
 
     if highlight_species is None:
         # Highlight the top-3 by posterior-mean within this panel
-        top3 = set(sorted(species, key=lambda s: -by_name[s]["post_mean_p_extirpation"])[:3])
+        top3 = set(sorted(species, key=lambda s: -by_name[s]["post_mean_eta"])[:3])
     else:
         top3 = set(highlight_species)
     bar_colors = [DARK_GOLD if sp in top3 else color for sp in species]
@@ -161,12 +168,17 @@ def _plot_rank(ax, records, title, color, order_species=None,
     ax.barh(y, means, color=bar_colors, alpha=0.85, edgecolor="white")
     ax.errorbar(means, y, xerr=err, fmt="none", ecolor="black",
                 elinewidth=0.8, capsize=2, alpha=0.5)
+    # Reference line at η = 0 (= log-odds 0 ↔ p = 0.5, the moderate-risk
+    # threshold). Species with η > 0 across most cells are projected to
+    # be more likely than not to be extirpated under SSP3-7.0.
+    ax.axvline(0, color="black", linewidth=0.6, linestyle="--", alpha=0.4)
     ax.set_yticks(y)
     ax.set_yticklabels([f"B. {sp}" for sp in species], fontsize=8)
     ax.invert_yaxis()
-    ax.set_xlabel("Posterior-mean extirpation probability\n(95% HDI)")
+    ax.set_xlabel("Posterior-mean η (log-odds of extirpation)\n(95% HDI; η > 0 ↔ p > 0.5)")
     ax.set_title(title, fontsize=11)
-    ax.set_xlim(0, max(0.05, means.max() * 1.25))
+    span = max(abs(means.min()), abs(means.max()))
+    ax.set_xlim(-span * 1.15, span * 1.15)
     ax.grid(axis="x", linewidth=0.3, alpha=0.5)
 
 
@@ -175,7 +187,14 @@ def _plot_rank(ax, records, title, color, order_species=None,
 
 # %%
 def _draw_healpix_map(ax, raster_per_cell, title):
-    """Draw the 110-cell Iberia raster as colour-filled polygons."""
+    """Draw the Iberia raster as colour-filled HEALPix-cell polygons.
+
+    Diverging colormap centred on η = 0 (the moderate-risk threshold:
+    log-odds 0 ↔ p = 0.5). Red cells = high projected extirpation
+    tendency; blue = low; white ≈ moderate. We plot η rather than
+    p = expit(η) because future predictors lie far outside training
+    distribution and expit() saturates uninformatively.
+    """
     proj = ccrs.PlateCarree()
     ax.set_extent([-10.5, 4.5, 35.0, 44.5], crs=proj)
     ax.add_feature(cfeature.LAND, facecolor="#f5f5f5", zorder=0)
@@ -188,9 +207,9 @@ def _draw_healpix_map(ax, raster_per_cell, title):
         ax.set_title(title + " (no data)", fontsize=11)
         return None
 
-    vmax = max(0.01, np.nanpercentile(raster_per_cell, 98))
-    cmap = plt.get_cmap("YlOrRd")
-    norm = plt.Normalize(vmin=0, vmax=vmax)
+    span = max(0.5, float(np.nanpercentile(np.abs(raster_per_cell), 98)))
+    cmap = plt.get_cmap("RdBu_r")
+    norm = plt.Normalize(vmin=-span, vmax=+span)
 
     polys = poly_xy[valid]
     vals = raster_per_cell[valid]
@@ -222,12 +241,12 @@ records_mid = summary["horizons"]["2030_2039"]["species_ranked"]
 # each horizon (per its own ranking) in dark gold.
 def _top3_species(records):
     return [r["species"] for r in
-            sorted(records, key=lambda r: -r["post_mean_p_extirpation"])[:3]]
+            sorted(records, key=lambda r: -r["post_mean_eta"])[:3]]
 
 
 mid_order = [
     r["species"] for r in
-    sorted(records_mid, key=lambda r: -r["post_mean_p_extirpation"])
+    sorted(records_mid, key=lambda r: -r["post_mean_eta"])
 ]
 top3_near = set(_top3_species(records_near))
 top3_mid = set(_top3_species(records_mid))
@@ -269,7 +288,7 @@ def _plot_map(horizon: str, raster: np.ndarray) -> Path:
     if pc is not None:
         cbar = plt.colorbar(pc, ax=ax, orientation="vertical",
                             fraction=0.04, pad=0.03)
-        cbar.set_label("Community-mean extirpation probability")
+        cbar.set_label("Community-mean η (log-odds of extirpation)")
     fig.text(
         0.5, 0.01, DATA_FOOTER,
         ha="center", va="bottom", fontsize=8, color="dimgray", style="italic",
@@ -333,7 +352,7 @@ if impactful in per_cell:
         plt.colorbar(
             pc, ax=ax_map, orientation="vertical",
             fraction=0.04, pad=0.03,
-            label="Community-mean extirpation probability",
+            label="Community-mean η (log-odds of extirpation)",
         )
 
 fig.suptitle(

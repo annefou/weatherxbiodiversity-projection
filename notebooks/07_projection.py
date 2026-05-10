@@ -55,7 +55,10 @@ import arviz as az
 import numpy as np
 import pandas as pd
 import xarray as xr
-from scipy.special import expit
+# scipy.special.expit intentionally NOT imported — we report the GLMM
+# linear predictor η directly, not its logistic transform. See the
+# "We REPORT η directly" comment in the per-species inner loop, and
+# 05_outcome.md § Limitations.
 
 # %%
 ROOT = Path("..").resolve()
@@ -251,9 +254,10 @@ for horizon in HORIZONS:
     prab_baseline_ord = prab_baseline[pa_order]      # (n_spp, 110)
     prab_recent_ord = prab_recent[pa_order]
 
-    # Per-cell community-mean probability accumulator (across species
-    # historically observed in the cell).
-    p_per_cell_sum = np.zeros(len(sampling), dtype=np.float64)
+    # Per-cell community-mean η accumulator (across species historically
+    # observed in the cell). Linear-predictor units (log-odds) — kept
+    # un-transformed to avoid expit() saturation under future predictors.
+    eta_per_cell_sum = np.zeros(len(sampling), dtype=np.float64)
     n_species_per_cell = np.zeros(len(sampling), dtype=np.int64)
 
     species_records = []
@@ -308,38 +312,55 @@ for horizon in HORIZONS:
         if sp in spp_to_re_col:
             re_per_draw = species_re_draws[:, spp_to_re_col[sp]]   # (N_DRAWS,)
             eta = eta + re_per_draw[np.newaxis, :]
-        p = expit(eta)                               # (n_valid, N_DRAWS)
+
+        # We REPORT η directly, not p = expit(η). Reason: future TEI/PEI
+        # z-scores under SSP3-7.0 land 5–10× outside the Tier-1 training
+        # distribution (a multi-decade warming signal vs the 60-year
+        # training-period delta). expit() saturates near 1.0 in that
+        # extrapolation regime, making absolute probabilities
+        # uninterpretable. η preserves relative ranking and the linear
+        # predictor magnitude is the GLMM's authentic signal — it is
+        # also what the bambi NUTS posterior is actually sampled over.
+        # See nanopubs/drafts/05_outcome.md § Limitations.
 
         # Per-species summary across cells × draws:
-        #   - per-cell posterior mean p (averaged over draws)
-        #   - per-draw species-level mean p (averaged over cells)
-        p_post_mean_per_cell = p.mean(axis=1)        # (n_valid,)
-        p_post_per_draw = p.mean(axis=0)             # (N_DRAWS,)
-        post_mean_p = float(p_post_per_draw.mean())
+        #   - per-cell posterior-mean η (averaged over draws)
+        #   - per-draw species-level mean η (averaged over cells)
+        eta_post_mean_per_cell = eta.mean(axis=1)    # (n_valid,)
+        eta_post_per_draw = eta.mean(axis=0)         # (N_DRAWS,)
+        post_mean_eta = float(eta_post_per_draw.mean())
         # az.hdi on a 1-d array returns shape (2,) = [low, high]
-        hdi = az.hdi(p_post_per_draw, hdi_prob=0.95)
+        hdi = az.hdi(eta_post_per_draw, hdi_prob=0.95)
         hdi_low, hdi_high = float(hdi[0]), float(hdi[1])
+        # A non-saturating proxy for "fraction of cells projected to
+        # exceed the moderate-risk threshold of η = 0 (= log-odds 0,
+        # i.e. p > 0.5)". Robust to extrapolation at the per-cell level.
+        n_cells_eta_gt_0 = int((eta_post_mean_per_cell > 0).sum())
 
         species_records.append({
             "species": sp,
-            "post_mean_p_extirpation": post_mean_p,
-            "hdi95_low": hdi_low,
-            "hdi95_high": hdi_high,
+            "post_mean_eta": post_mean_eta,
+            "eta_hdi95_low": hdi_low,
+            "eta_hdi95_high": hdi_high,
             "n_cells": int(valid.sum()),
+            "n_cells_eta_gt_0": n_cells_eta_gt_0,
         })
 
-        p_per_cell_sum[cell_full_idx] += p_post_mean_per_cell
+        eta_per_cell_sum[cell_full_idx] += eta_post_mean_per_cell
         n_species_per_cell[cell_full_idx] += 1
 
     species_records.sort(
-        key=lambda r: r["post_mean_p_extirpation"], reverse=True,
+        key=lambda r: r["post_mean_eta"], reverse=True,
     )
 
-    # Per-cell community-mean probability (gitignored CF NetCDF).
+    # Per-cell community-mean η (gitignored CF NetCDF). Linear predictor
+    # in log-odds units; not transformed via expit because future
+    # predictors are far outside training distribution and expit()
+    # saturates uninformatively.
     with np.errstate(invalid="ignore"):
-        p_per_cell_mean = np.where(
+        eta_per_cell_mean = np.where(
             n_species_per_cell > 0,
-            p_per_cell_sum / np.maximum(n_species_per_cell, 1),
+            eta_per_cell_sum / np.maximum(n_species_per_cell, 1),
             np.nan,
         )
 
@@ -351,19 +372,23 @@ for horizon in HORIZONS:
     decade_label = horizon.replace("_", "-")
     raster_ds = xr.Dataset(
         data_vars={
-            "community_mean_p_extirpation": (
+            "community_mean_eta": (
                 ("cell",),
-                p_per_cell_mean.astype(np.float32),
+                eta_per_cell_mean.astype(np.float32),
                 {
                     "long_name": (
-                        "per-cell community-mean extirpation probability "
-                        "under SSP3-7.0"
+                        "per-cell community-mean GLMM linear predictor (η, "
+                        "log-odds of extirpation) under SSP3-7.0"
                     ),
                     "units": "1",
                     "comment": (
-                        f"Mean across {len(species_in_parquet)} species, "
+                        f"Mean η across {len(species_in_parquet)} species, "
                         f"each species' contribution averaged over {N_DRAWS} "
-                        "posterior draws"
+                        "posterior draws. η > 0 → projected p > 0.5; "
+                        "η > +5 → near logit saturation (p ≈ 0.99). "
+                        "Reported as η rather than expit(η) because future "
+                        "predictors lie 5–10× outside training distribution "
+                        "where expit() saturates uninformatively."
                     ),
                     "_FillValue": np.float32(np.nan),
                 },
@@ -429,7 +454,7 @@ for horizon in HORIZONS:
         RESULTS_DIR / f"projection_{horizon}.nc",
         engine="netcdf4",
         encoding={
-            "community_mean_p_extirpation": {"zlib": True, "complevel": 4},
+            "community_mean_eta": {"zlib": True, "complevel": 4},
             "lon": {"zlib": True, "complevel": 4},
             "lat": {"zlib": True, "complevel": 4},
             "n_species_in_cell": {"zlib": True, "complevel": 4},
@@ -445,13 +470,14 @@ for horizon in HORIZONS:
         "species_ranked": species_records,
     }
 
-    print(f"\n--- Top 5 most-vulnerable species ({horizon}) ---")
+    print(f"\n--- Top 5 most-vulnerable species ({horizon}) — ranked by mean η ---")
     for rec in species_records[:5]:
         print(
             f"  B. {rec['species']:<14}  "
-            f"post-mean p = {rec['post_mean_p_extirpation']:.3f}  "
-            f"95% HDI [{rec['hdi95_low']:.3f}, {rec['hdi95_high']:.3f}]  "
-            f"n_cells = {rec['n_cells']}"
+            f"post-mean η = {rec['post_mean_eta']:+.3f}  "
+            f"95% HDI [{rec['eta_hdi95_low']:+.3f}, {rec['eta_hdi95_high']:+.3f}]  "
+            f"n_cells = {rec['n_cells']}  "
+            f"(n_cells with η>0: {rec['n_cells_eta_gt_0']})"
         )
 
 # %% [markdown]
@@ -478,6 +504,18 @@ projection_summary["method"] = {
     "design_columns": PARAM_NAMES,
     "posterior_total_samples": int(n_samples_total),
     "rng_seed": 42,
+    "headline_metric": "post_mean_eta",
+    "headline_metric_comment": (
+        "Per-species posterior-mean of (mean η across cells), 95% HDI in "
+        "log-odds units. We report η — the GLMM linear predictor — rather "
+        "than p = expit(η) because future TEI/PEI z-scores under SSP3-7.0 "
+        "lie 5–10× outside the Tier-1 training distribution (the future "
+        "warming signal is ~2× the 1901–2014 training delta), where "
+        "expit() saturates near 1.0 uninformatively. Ranking by η "
+        "preserves the GLMM's authentic signal; relative-risk-style "
+        "comparisons (e.g. n_cells_eta_gt_0) are more substrate-stable "
+        "than absolute probabilities. See 05_outcome.md § Limitations."
+    ),
 }
 
 out_json = RESULTS_DIR / "projection_headline.json"

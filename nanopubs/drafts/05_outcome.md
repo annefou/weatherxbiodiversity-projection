@@ -80,6 +80,8 @@ Honest caveats. If the result is partial or contradicted, say so plainly. Don't 
 
 ```
 While Soroye 2020's TEI→extirpation mechanism is substrate-robust between sphere-HEALPix and WGS84-ellipsoidal HEALPix at matched cell scale (Tier 1 Outcome [URI]), per-species ranking near the logit saturation boundary (P > 0.7) is sensitive to grid choice. A 9% change in cell coverage between substrates shifted the top-3 species list. Practitioners should treat absolute-probability rankings near saturation with caution and prefer substrate-stable summary statistics (e.g. relative risk, count of species above a moderate threshold) for prioritisation decisions.
+
+The Tier-2 projection therefore reports the GLMM linear predictor η (log-odds of extirpation) rather than its logistic transform p = expit(η). Future TEI/PEI z-scores under SSP3-7.0 lie 5–10× outside the Tier-1 training distribution (the 2020–2039 vs 1901–1974 warming signal is roughly twice the 2000–2014 vs 1901–1974 signal the GLMM was calibrated against), driving most species' linear predictors past η = +5 in many cells where expit(η) saturates uninformatively at ≈ 1.0. The η-based ranking preserves the GLMM's authentic signal: most-vulnerable species under SSP3-7.0 are cold-adapted, range-edge taxa (B. norvegicus, B. mendax, B. mucidus, B. pyrenaeus); B. terrestris and B. pascuorum show negative projected η (slight decrease in extirpation tendency), driven by precipitation predictors. Absolute extirpation probabilities derived from this projection are not interpretable as-is; relative ranking by η, fraction of cells with η > 0, and direction-of-effect are the substrate-stable summaries.
 ```
 
 > **Drafter notes — additional limitations to weave into the textarea above when finalising this Outcome.** These are NOT to be pasted as-is; condense as needed.
@@ -89,6 +91,7 @@ While Soroye 2020's TEI→extirpation mechanism is substrate-robust between sphe
 > - **Sampling effort held at recent-period mean** for the projection — assumes monitoring intensity in 2020-2039 mirrors the 2000-2014 baseline; biases the projection if survey effort actually changes.
 > - **Daily Tmax/Tmin from 4-times-daily 2t snapshots** — 06_destine_clean approximates daily extremes from the 00/06/12/18 UTC samples rather than from true daily max/min (which DestinE Climate DT does not archive — see notebooks/05_destine_download.py § Why no native max/min).
 > - **`tp` 1-time-per-day approximation in the DestinE retrieve** — flagged in 06_destine_clean as TP_HOURLY_TO_DAILY_FACTOR; defensible at decadal mean, invalid for any sub-monthly statistic.
+> - **Small-N in the most-vulnerable taxa** — top-ranked species (norvegicus, mendax, mucidus, pyrenaeus) are observed in 1–7 Iberian cells in the 1901–1974 baseline period; high η reflects strong climate forcing at those few cells, not breadth of impact across the species' range. Treat the per-species η ranking jointly with `n_cells` and `n_cells_eta_gt_0` from `results/projection_headline.json`.
 
 ## Publication note
 
