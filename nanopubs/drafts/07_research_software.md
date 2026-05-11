@@ -13,7 +13,7 @@
 Zenodo concept DOI URL when available, or a GitHub URL. Full URL form.
 
 ```
-10.5281/zenodo.20113777
+https://doi.org/10.5281/zenodo.20113777
 ```
 
 ### Software Title (text input, required)
@@ -21,7 +21,7 @@ Zenodo concept DOI URL when available, or a GitHub URL. Full URL form.
 The full name or title of the software.
 
 ```
-
+weatherxbiodiversity-projection — Iberian Bombus extirpation under DestinE Climate DT SSP3-7.0 (canonical replication of Soroye et al. 2020)
 ```
 
 ### Repository URL (text input, required)
@@ -35,7 +35,7 @@ https://github.com/annefou/weatherxbiodiversity-projection
 URI of the FORRT Claim or PCC question this software is associated with — pull from `nanopubs/PUBLISHED.md`. This is the back-link to the FORRT chain.
 
 ```
-
+<replace-with-published-Claim-URI-from-step-03>
 ```
 
 ### License (text input, optional)
@@ -48,15 +48,16 @@ https://spdx.org/licenses/MIT.html
 
 Input data DOIs (Zenodo data records, dataset DOIs, ESA product DOIs).
 
-- _Dataset URL 1: ___
-- _Dataset URL 2: ___
+- Soroye Figshare deposit (CRU TS 3.24.01 + Kerr species list): https://doi.org/10.6084/m9.figshare.10058340
+- GBIF Iberian Bombus occurrence download DOI: <replace-with-GBIF-download-DOI-once-issued>
+- DestinE Climate DT SSP3-7.0 (IFS-NEMO standard, native HEALPix nside=128) — accessed via polytope on LUMI, not a fixed DOI; cite the DestinE Data Lake catalogue entry
 
 ### Related Publications (repeatable group, optional)
 
 One-way back-links to the FORRT Outcome URI(s) the software implements, plus any cited methods papers.
 
-- _Publication URL 1 (FORRT Outcome from step 05): ___
-- _Publication URL 2 (methods paper, optional): ___
+- FORRT Outcome from step 05 of this chain: `<replace-with-published-Outcome-URI-from-step-05>`
+- Soroye, Newbold & Kerr (2020) — original paper whose mechanism this software replicates: https://doi.org/10.1126/science.aax8591
 
 ## Publication note
 
