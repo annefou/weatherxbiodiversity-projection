@@ -39,12 +39,13 @@ Each step in the chain references the URI of the previous step:
 
 Don't try to publish out of order. Don't forget to update `PUBLISHED.md` as you go — downstream drafts pull from there.
 
-## Optional layers
+## Optional layer
 
-Once the six-step chain is published, two optional further nanopubs may apply:
+Once the six-step chain is published, one optional further nanopub applies for this chain:
 
-- **Research Software** — when the repo *produces* a reusable software artefact (an upstream library, not a one-off demo). Cites back to the FORRT Claim URI as `Research Project`. Drafted in `drafts/07_research_software.md`. See `docs/forrt-form-fields.md` § Research Software and `CLAUDE.md` § Layered architecture: FORRT vs Research Software.
-- **Research Synthesis** — when this chain is one of several testing facets of a shared underlying property. Drafted in `drafts/08_synthesis.md`. See `docs/forrt-form-fields.md` § Research Synthesis.
+- **Research Software** — describes this repo as a reusable research-software artefact (Zenodo-archived, citable, MIT-licensed). Cites back to the FORRT Claim URI as `Research Project`. Drafted in `drafts/07_research_software.md`. See `docs/forrt-form-fields.md` § Research Software and `CLAUDE.md` § Layered architecture: FORRT vs Research Software.
+
+A **Research Synthesis** nanopub is not published from this chain — the natural place for the cross-chain synthesis is the methodological sibling repository `weatherxbiodiversity-substrate-sensitivity`, which combines this Outcome with the nside=128 sibling Outcome and its own diagnostic Outcome into a single Research Synthesis. See that repo's `drafts/08_synthesis.md`.
 
 ## What lives in `drafts/` after publishing
 
