@@ -46,7 +46,7 @@ DOIs/URLs of datasets that ground the AIDA claim.
 
 - CRU TS 3.24.01 climate (Soroye Figshare bundle, kept identical to original)
 - GBIF Iberian Bombus occurrence download DOI (own-issued; record the DOI here once minted)
-- This repo's Zenodo concept DOI: `<replace-with-Zenodo-concept-DOI>`
+- This repo's Zenodo concept DOI: `10.5281/zenodo.20113777`
 
 ### Supported by other publications (repeatable group, optional)
 

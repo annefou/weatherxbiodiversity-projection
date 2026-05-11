@@ -44,7 +44,7 @@ https://doi.org/10.1126/science.aax8591
 <replace-with-nside128-sibling-Outcome-URI-from-its-PUBLISHED.md>
 ```
 
-(Or: cite the sibling repo's Zenodo concept DOI: `<replace-with-nside128-Zenodo-concept-DOI>`.)
+(Or: cite the sibling repo's Zenodo concept DOI: `10.5281/zenodo.20113780`.)
 
 #### Citation 3 — extends the methodological substrate-sensitivity sibling chain
 
@@ -60,7 +60,7 @@ https://doi.org/10.1126/science.aax8591
 <replace-with-substrate-sensitivity-Outcome-URI-from-its-PUBLISHED.md>
 ```
 
-(Or: cite that repo's Zenodo concept DOI: `<replace-with-substrate-sensitivity-Zenodo-concept-DOI>`.)
+(Or: cite that repo's Zenodo concept DOI: `10.5281/zenodo.20113786`.)
 
 ## Publication note
 
