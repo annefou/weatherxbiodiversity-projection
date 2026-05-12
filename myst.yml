@@ -27,7 +27,7 @@ project:
         - file: notebooks/06_destine_clean.ipynb
         - file: notebooks/07_projection.ipynb
         - file: notebooks/08_projection_figures.ipynb
-    - file: nanopubs/README.md
+    - file: nanopubs/PUBLISHED.md
 site:
   title: "weatherxbiodiversity-projection"
 # IMPORTANT: do NOT set base_url here — MyST silently ignores the key.
