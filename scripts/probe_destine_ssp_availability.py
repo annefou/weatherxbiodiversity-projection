@@ -58,9 +58,11 @@ PROBE_DATE = "2030-07-01"
 # different coverage).
 PROBE_DATE_LATE = "2049-12-31"
 
-# Simplest variable to retrieve: 2-metre temperature (param 130) at the
-# first daily timestep.
-PROBE_PARAM = "130"
+# Cheapest variable to retrieve: total precipitation (param 228,
+# accumulated) at the first daily timestep (~50 MB per probe at global
+# HEALPix nside=128, vs ~200 MB for 4×/day t2m). Matches the param keys
+# used in the canonical chain's 05_destine_download.py.
+PROBE_PARAM = "228"
 PROBE_TIME = "0000"
 
 OUT_JSON = Path(__file__).resolve().parent.parent / "results" / "destine_ssp_availability.json"
@@ -73,6 +75,12 @@ MIN_BYTES = 100_000  # a returned GRIB smaller than this likely indicates empty 
 # ---------------------------------------------------------------------------
 
 def build_minimal_request(*, experiment: str, model: str, date: str) -> dict:
+    """Minimal polytope request — matches the canonical chain's
+    05_destine_download.build_request() shape exactly except for the
+    1-day date window. The `date` field MUST use the `start/to/end`
+    range syntax even for a single-day probe; bare strings raise a
+    generic 'Polytope error'.
+    """
     return {
         "class": "d1",
         "dataset": "climate-dt",
@@ -87,7 +95,7 @@ def build_minimal_request(*, experiment: str, model: str, date: str) -> dict:
         "stream": "clte",
         "levtype": "sfc",
         "param": PROBE_PARAM,
-        "date": date,
+        "date": f"{date}/to/{date}",
         "time": PROBE_TIME,
     }
 
@@ -121,9 +129,13 @@ def probe(client: Client, *, experiment: str, model: str, date: str,
         }
     except Exception as e:
         elapsed = time.time() - t0
-        msg = str(e).strip().splitlines()[0][:160] if str(e) else type(e).__name__
-        lower = msg.lower()
-        if "not found" in lower or "no data" in lower or "no values" in lower:
+        # Keep the full message (up to 800 chars) — polytope's real
+        # diagnostic is often on later lines, so splitlines()[0] discards
+        # it. Multiline messages render as escaped \n in the JSON.
+        msg_full = str(e).strip() if str(e) else type(e).__name__
+        msg_full = msg_full[:800]
+        lower = msg_full.lower()
+        if "not found" in lower or "no data" in lower or "no values" in lower or "no entries" in lower:
             classification = "catalogue_missing"
         elif "auth" in lower or "credential" in lower or "401" in lower or "403" in lower:
             classification = "auth_error"
@@ -134,7 +146,8 @@ def probe(client: Client, *, experiment: str, model: str, date: str,
         return {
             "status": classification,
             "elapsed_s": round(elapsed, 1),
-            "error": msg,
+            "error": msg_full,
+            "error_type": type(e).__name__,
         }
 
 
