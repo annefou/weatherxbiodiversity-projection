@@ -49,14 +49,18 @@ CANDIDATE_MODELS = [
     "ICON",
 ]
 
-# Reference date in the projection window (well inside any plausible
-# scenario archive coverage of the 2020s).
-PROBE_DATE = "2030-07-01"
+# Reference dates in YYYYMMDD format (no hyphens — required by the
+# DestinE polytope MARS-style date parser; ISO-hyphenated dates make
+# the catalogue accept the request then fail at retrieve time with
+# generic 'HTTP CLIENT ERROR').
+PROBE_DATE_START = "20300701"
+PROBE_DATE_END = "20300703"  # 3-day window — minimum to reliably succeed
 
 # Mid-century probe to detect scenario-archive truncation (e.g. SSP3-7.0
 # was populated through 2039 only as of 2026-05; SSP1-2.6 may have
 # different coverage).
-PROBE_DATE_LATE = "2049-12-31"
+PROBE_DATE_LATE_START = "20491229"
+PROBE_DATE_LATE_END = "20491231"
 
 # Cheapest variable to retrieve: total precipitation (param 228,
 # accumulated) at the first daily timestep (~50 MB per probe at global
@@ -74,12 +78,12 @@ MIN_BYTES = 100_000  # a returned GRIB smaller than this likely indicates empty 
 # Probe logic
 # ---------------------------------------------------------------------------
 
-def build_minimal_request(*, experiment: str, model: str, date: str) -> dict:
+def build_minimal_request(*, experiment: str, model: str,
+                          start: str, end: str) -> dict:
     """Minimal polytope request — matches the canonical chain's
-    05_destine_download.build_request() shape exactly except for the
-    1-day date window. The `date` field MUST use the `start/to/end`
-    range syntax even for a single-day probe; bare strings raise a
-    generic 'Polytope error'.
+    05_destine_download.build_request() shape exactly. Dates MUST be in
+    YYYYMMDD format with no separators; ISO YYYY-MM-DD will be accepted
+    by the catalogue and then fail at retrieve with 'HTTP CLIENT ERROR'.
     """
     return {
         "class": "d1",
@@ -95,21 +99,22 @@ def build_minimal_request(*, experiment: str, model: str, date: str) -> dict:
         "stream": "clte",
         "levtype": "sfc",
         "param": PROBE_PARAM,
-        "date": f"{date}/to/{date}",
+        "date": f"{start}/to/{end}",
         "time": PROBE_TIME,
     }
 
 
-def probe(client: Client, *, experiment: str, model: str, date: str,
-          tmp: Path) -> dict:
+def probe(client: Client, *, experiment: str, model: str,
+          start: str, end: str, tmp: Path) -> dict:
     """Issue a minimum-size retrieve. Return a status dict.
 
     Categorises errors so the summary table is informative without
     requiring the user to read every traceback. Specific error messages
     are not stable polytope contracts — pattern-match cautiously.
     """
-    request = build_minimal_request(experiment=experiment, model=model, date=date)
-    out_grib = tmp / f"{experiment.replace('.', '_')}__{model}__{date}.grib"
+    request = build_minimal_request(experiment=experiment, model=model,
+                                     start=start, end=end)
+    out_grib = tmp / f"{experiment.replace('.', '_')}__{model}__{start}_{end}.grib"
     t0 = time.time()
     try:
         client.retrieve(POLYTOPE_COLLECTION, request, output_file=str(out_grib))
@@ -135,9 +140,17 @@ def probe(client: Client, *, experiment: str, model: str, date: str,
         msg_full = str(e).strip() if str(e) else type(e).__name__
         msg_full = msg_full[:800]
         lower = msg_full.lower()
+        # Heuristic classification — polytope error strings aren't a
+        # stable contract, so pattern-match cautiously. `HTTP CLIENT
+        # ERROR` (no further detail) typically means the retrieve was
+        # syntactically accepted but the underlying MARS/HDA failed to
+        # find data; treat that as 'data_missing' (separate from
+        # 'catalogue_missing' which would reject the request outright).
         if "not found" in lower or "no data" in lower or "no values" in lower or "no entries" in lower:
             classification = "catalogue_missing"
-        elif "auth" in lower or "credential" in lower or "401" in lower or "403" in lower:
+        elif "http client error" in lower or "client error" in lower:
+            classification = "data_missing"
+        elif "credential" in lower or "401" in lower or "403" in lower or "unauthori" in lower:
             classification = "auth_error"
         elif "timeout" in lower or "timed out" in lower:
             classification = "timeout"
@@ -159,8 +172,8 @@ def main() -> None:
     print(f"DestinE Climate DT SSP availability probe")
     print(f"  polytope address:    {POLYTOPE_ADDRESS}")
     print(f"  polytope collection: {POLYTOPE_COLLECTION}")
-    print(f"  probe date (mid):    {PROBE_DATE}")
-    print(f"  probe date (late):   {PROBE_DATE_LATE}")
+    print(f"  probe mid window:    {PROBE_DATE_START}/to/{PROBE_DATE_END}")
+    print(f"  probe late window:   {PROBE_DATE_LATE_START}/to/{PROBE_DATE_LATE_END}")
     print(f"  probe variable:      param={PROBE_PARAM} time={PROBE_TIME}")
     print(f"  probed at:           {datetime.utcnow().isoformat()}Z")
     print()
@@ -171,8 +184,8 @@ def main() -> None:
         "metadata": {
             "address": POLYTOPE_ADDRESS,
             "collection": POLYTOPE_COLLECTION,
-            "probe_date_mid": PROBE_DATE,
-            "probe_date_late": PROBE_DATE_LATE,
+            "probe_mid_window": f"{PROBE_DATE_START}/to/{PROBE_DATE_END}",
+            "probe_late_window": f"{PROBE_DATE_LATE_START}/to/{PROBE_DATE_LATE_END}",
             "probed_at_utc": datetime.utcnow().isoformat() + "Z",
         },
         "combinations": [],
@@ -185,22 +198,25 @@ def main() -> None:
                 print(f"--- experiment={experiment!r:>11}  model={model!r:>11} ---")
                 # First probe: mid-window
                 r_mid = probe(client, experiment=experiment, model=model,
-                              date=PROBE_DATE, tmp=tmp)
+                              start=PROBE_DATE_START, end=PROBE_DATE_END, tmp=tmp)
+                mid_label = f"{PROBE_DATE_START}/{PROBE_DATE_END}"
                 if r_mid["status"] == "ok":
-                    print(f"  mid  ({PROBE_DATE}): OK  "
+                    print(f"  mid  ({mid_label}): OK  "
                           f"{r_mid['size_bytes']:>12,} B  in {r_mid['elapsed_s']}s")
                     # Only probe late if mid succeeded
                     r_late = probe(client, experiment=experiment, model=model,
-                                   date=PROBE_DATE_LATE, tmp=tmp)
+                                   start=PROBE_DATE_LATE_START,
+                                   end=PROBE_DATE_LATE_END, tmp=tmp)
+                    late_label = f"{PROBE_DATE_LATE_START}/{PROBE_DATE_LATE_END}"
                     if r_late["status"] == "ok":
-                        print(f"  late ({PROBE_DATE_LATE}): OK  "
+                        print(f"  late ({late_label}): OK  "
                               f"{r_late['size_bytes']:>12,} B  in {r_late['elapsed_s']}s")
                     else:
-                        print(f"  late ({PROBE_DATE_LATE}): {r_late['status']}  "
+                        print(f"  late ({late_label}): {r_late['status']}  "
                               f"({r_late.get('error', '')[:80]})")
                 else:
                     r_late = {"status": "skipped", "note": "mid-window probe failed"}
-                    print(f"  mid  ({PROBE_DATE}): {r_mid['status']}  "
+                    print(f"  mid  ({mid_label}): {r_mid['status']}  "
                           f"({r_mid.get('error', '')[:80]})")
 
                 results["combinations"].append({
