@@ -10,6 +10,8 @@ The replication has **two tiers**:
 - **Tier 1 — historical fit.** Replicates Soroye's GLMM on Iberian *Bombus* using Soroye's own CRU TS 3.24.01 climate inputs (Figshare deposit) and own-issued GBIF download DOIs. Run twice: once on the original CEA grid (~100 km), once on HEALPix nside=64 (~92 km).
 - **Tier 2 — future projection.** Applies the fitted GLMM to DestinE Climate DT SSP3-7.0 (IFS-NEMO standard, native HEALPix nside=128) for the 2020–2029 and 2030–2039 horizons. The only place new climate data enters.
 
+> **HEALPix terminology (GRID4EARTH).** This study uses HEALPix at `nside = 64`. In the GRID4EARTH / [`healpix-geo`](https://healpix-geo.readthedocs.io/) vocabulary that is **depth 6** (`nside = 2**depth`). HEALPix bins are **cells** (each addressed by a `uint64` **`ipix`** index) in **NESTED** ordering, evaluated on the **WGS84 ellipsoid** via the authalic-sphere mapping — not a bare sphere. We keep the `nside` spelling in code for healpy-compatibility, but the equal-area guarantee comes from the ellipsoidal (`ellipsoid="WGS84"`) path.
+
 ## Headline result — Tier 1
 
 ![Tier-1 GLMM coefficient summary: sc_TEI_delta is positive, large, and credible at CEA (+0.479) and HEALPix nside=64 (+0.454, 95% HDI [+0.130, +0.751])](figures/main_result_healpix.png)
