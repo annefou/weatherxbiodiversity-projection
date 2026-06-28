@@ -30,6 +30,8 @@ project:
     - file: nanopubs/PUBLISHED.md
 site:
   title: "weatherxbiodiversity-projection"
+  options:
+    favicon: favicon.png
 # IMPORTANT: do NOT set base_url here — MyST silently ignores the key.
 # BASE_URL is set in .github/workflows/jupyter-book.yml as an env var on the
 # `myst build` step, derived from the GitHub repo name. See
